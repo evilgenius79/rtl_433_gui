@@ -2,7 +2,7 @@
 import { store } from '../state.js';
 import {
   pickPrimary, labelOf, unitOf, fmtValue, fmtValueUnit, metricKeysOf,
-  fmtAgo, fmtUptime, signalLevel, deviceTitle,
+  fmtAgo, fmtUptime, signalLevel, deviceTitle, esc,
 } from '../format.js';
 import { renderSparkline } from '../chart.js';
 import { focusDevice } from './charts.js';
@@ -37,6 +37,8 @@ export function initDashboard() {
     <div class="section-head">
       <h2 class="section-title">Live devices</h2>
       <span class="section-sub" id="dash-devcount"></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-ghost btn-sm" id="dash-reset" title="Forget all devices and their chart history (also clears the saved copy)">Reset data</button>
     </div>
     <div class="device-grid" id="device-grid"></div>
     <div class="empty-state" id="dash-empty">
@@ -45,10 +47,21 @@ export function initDashboard() {
       <div class="small">Press <b>Start</b> to begin receiving. Devices appear here automatically as their transmissions are decoded — or flip on <b>Demo mode</b> in the sidebar to explore with simulated traffic.</div>
     </div>`;
 
+  document.getElementById('dash-reset').addEventListener('click', () => {
+    store.clearAll();
+    window.toast('Device list and history cleared.');
+  });
+
   store.on('devices', renderDevices);
   store.on('status', renderStats);
   setInterval(renderStats, 1000);
   setInterval(renderRelativeTimes, 5000);
+  renderDevices();
+  renderStats();
+}
+
+// called by the shell when this view becomes visible again
+export function refreshDashboard() {
   renderDevices();
   renderStats();
 }
@@ -79,37 +92,37 @@ function cardHtml(dev) {
   const evt = dev.lastEvent;
   const primary = pickPrimary(evt);
   const chips = [];
-  if (evt.id != null) chips.push(`<span class="chip" title="Device ID">ID ${evt.id}</span>`);
-  if (evt.channel != null && evt.channel !== '') chips.push(`<span class="chip" title="Channel">CH ${evt.channel}</span>`);
+  if (evt.id != null) chips.push(`<span class="chip" title="Device ID">ID ${esc(evt.id)}</span>`);
+  if (evt.channel != null && evt.channel !== '') chips.push(`<span class="chip" title="Channel">CH ${esc(evt.channel)}</span>`);
 
   let primaryHtml = '';
   if (primary != null) {
-    primaryHtml = `<div class="device-primary" title="${labelOf(primary)}">
-      <span class="val">${fmtValue(primary, evt[primary])}</span>
-      <span class="unit">${unitOf(primary) || labelOf(primary)}</span>
+    primaryHtml = `<div class="device-primary" title="${esc(labelOf(primary))}">
+      <span class="val">${esc(fmtValue(primary, evt[primary]))}</span>
+      <span class="unit">${esc(unitOf(primary) || labelOf(primary))}</span>
     </div>`;
   } else {
     const state = evt.state || evt.event || evt.code || '—';
-    primaryHtml = `<div class="device-primary"><span class="val" style="font-size:20px">${String(state).slice(0, 18)}</span></div>`;
+    primaryHtml = `<div class="device-primary"><span class="val" style="font-size:20px">${esc(String(state).slice(0, 18))}</span></div>`;
   }
 
   const secondary = metricKeysOf(evt)
     .filter((k) => k !== primary)
     .slice(0, 3)
-    .map((k) => `<div class="kv"><span class="k">${labelOf(k)}</span><span class="v">${fmtValueUnit(k, evt[k])}</span></div>`)
+    .map((k) => `<div class="kv"><span class="k">${esc(labelOf(k))}</span><span class="v">${esc(fmtValueUnit(k, evt[k]))}</span></div>`)
     .join('');
 
   const lvl = signalLevel(evt.rssi);
   return `
     <div class="device-head">
-      <div class="device-name" title="${deviceTitle(dev)}">${deviceTitle(dev)}</div>
+      <div class="device-name" title="${esc(deviceTitle(dev))}">${esc(deviceTitle(dev))}</div>
       <div class="device-chips">${chips.join('')}</div>
     </div>
     ${primaryHtml}
     <div class="device-secondary">${secondary || '<span class="k" style="color:var(--text-3);font-size:12px">no numeric readings</span>'}</div>
     <div class="spark" data-spark></div>
     <div class="device-foot">
-      <span class="sig" data-level="${lvl}" title="RSSI ${evt.rssi ?? '—'} dB"><i></i><i></i><i></i><i></i></span>
+      <span class="sig" data-level="${lvl}" title="RSSI ${esc(evt.rssi ?? '—')} dB"><i></i><i></i><i></i><i></i></span>
       ${evt.rssi != null ? `<span>${evt.rssi.toFixed(0)} dB</span>` : ''}
       ${batteryBadge(evt)}
       <span class="spacer"></span>
@@ -118,6 +131,7 @@ function cardHtml(dev) {
 }
 
 function renderDevices() {
+  if (root.hidden) return; // refreshed on view switch instead
   const grid = document.getElementById('device-grid');
   const empty = document.getElementById('dash-empty');
   const devs = [...store.devices.values()].sort((a, b) => b.lastSeen - a.lastSeen);

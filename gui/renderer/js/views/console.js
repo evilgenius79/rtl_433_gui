@@ -4,6 +4,7 @@ import { fmtClock } from '../format.js';
 
 const root = document.getElementById('view-console');
 let autoScroll = true;
+let held = false; // user scrolled up: hold auto-scroll until they return to the bottom
 let rendered = 0;
 
 export function initConsole() {
@@ -25,6 +26,12 @@ export function initConsole() {
   });
   document.getElementById('con-clear').addEventListener('click', () => {
     store.clearLogs();
+  });
+
+  // reading back-scroll? hold the auto-scroll until the user returns to the bottom
+  const logHost = document.getElementById('con-log');
+  logHost.addEventListener('scroll', () => {
+    held = logHost.scrollTop + logHost.clientHeight < logHost.scrollHeight - 30;
   });
 
   store.on('logs', render);
@@ -59,5 +66,5 @@ function render() {
   host.appendChild(frag);
   // cap DOM nodes
   while (host.childNodes.length > 3000) host.removeChild(host.firstChild);
-  if (autoScroll) host.scrollTop = host.scrollHeight;
+  if (autoScroll && !held) host.scrollTop = host.scrollHeight;
 }

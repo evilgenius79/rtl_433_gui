@@ -1,15 +1,18 @@
 // Events view: filterable table of decoded transmissions with expandable
 // JSON detail rows and CSV / NDJSON export.
 import { store } from '../state.js';
-import { summarize, fmtClock } from '../format.js';
+import { summarize, fmtClock, esc } from '../format.js';
 
 const root = document.getElementById('view-events');
 const RENDER_CAP = 400;
+const RENDER_MIN_INTERVAL = 200; // ms between table rebuilds under load
 
 let filterText = '';
 let filterModel = '';
 let paused = false;
 let expanded = new Set(); // seq numbers with open detail row
+let lastRender = 0;
+let renderTimer = null;
 
 export function initEvents() {
   root.innerHTML = `
@@ -80,10 +83,28 @@ export function initEvents() {
   });
 
   store.on('events', () => {
-    if (!paused) render();
+    if (!paused) throttledRender();
     updateBadge();
   });
   render();
+}
+
+// called by the shell when this view becomes visible again
+export function refreshEvents() {
+  render();
+}
+
+function throttledRender() {
+  if (root.hidden) return; // refreshed on view switch instead
+  const since = Date.now() - lastRender;
+  if (since >= RENDER_MIN_INTERVAL) {
+    render();
+  } else if (!renderTimer) {
+    renderTimer = setTimeout(() => {
+      renderTimer = null;
+      if (!paused && !root.hidden) render();
+    }, RENDER_MIN_INTERVAL - since);
+  }
 }
 
 function updateBadge() {
@@ -101,11 +122,8 @@ function filtered() {
   return list;
 }
 
-function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 function render() {
+  lastRender = Date.now();
   // model filter options (kept up to date, selection preserved)
   const sel = document.getElementById('ev-model');
   const models = [...new Set([...store.devices.values()].map((d) => d.model))].sort();

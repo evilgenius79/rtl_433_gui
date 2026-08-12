@@ -1,7 +1,7 @@
 {
   "name": "rtl433-gui",
   "productName": "rtl_433 GUI",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Desktop GUI for rtl_433 - live dashboard, event log and charts for 433/868/915 MHz sensor traffic",
   "main": "main/main.js",
   "license": "GPL-2.0-or-later",
@@ -9,6 +9,7 @@
   "scripts": {
     "start": "electron .",
     "start:demo": "electron . --demo",
+    "test": "node --test \"test/*.test.js\"",
     "dist": "electron-builder --win",
     "dist:dir": "electron-builder --win --dir"
   },

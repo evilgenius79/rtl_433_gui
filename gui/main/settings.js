@@ -21,6 +21,10 @@ const DEFAULTS = {
   autoScrollConsole: true,
   maxEvents: 5000, // renderer event-log cap
   theme: 'dark',
+  autoStart: false, // begin receiving when the app opens
+  autoRestart: false, // relaunch rtl_433 if it exits unexpectedly
+  notifyNewDevice: false, // desktop notification when an unseen device appears
+  notifyLowBattery: true, // desktop notification when a sensor reports low battery
 };
 
 class Settings {

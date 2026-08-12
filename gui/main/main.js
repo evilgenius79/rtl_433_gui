@@ -1,9 +1,9 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { Settings } = require('./settings');
-const { Rtl433Process } = require('./rtl433');
+const { Rtl433Process, buildArgs, resolveBinary } = require('./rtl433');
 const { DemoSource } = require('./demo');
 
 let win = null;
@@ -12,6 +12,9 @@ const proc = new Rtl433Process();
 const demo = new DemoSource();
 let demoMode = process.argv.includes('--demo');
 let lastStatus = { state: 'stopped' };
+let manualStop = false; // user pressed Stop: suppress auto-restart
+let runStartedAt = 0;
+let restartTimer = null;
 
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
@@ -26,6 +29,21 @@ for (const src of [proc, demo]) {
     send('rt:status', lastStatus);
   });
 }
+
+// Auto-restart: if rtl_433 dies unexpectedly after having run for a while
+// (i.e. not a bad-flag/missing-binary startup failure), bring it back.
+proc.on('status', (s) => {
+  if (s.state === 'running') runStartedAt = Date.now();
+  const crashed = s.state === 'error' && !manualStop;
+  const ranLongEnough = runStartedAt && Date.now() - runStartedAt > 10000;
+  if (crashed && ranLongEnough && settings && settings.data.autoRestart && !demoMode) {
+    send('rt:log', { stream: 'app', line: 'auto-restart: rtl_433 stopped unexpectedly, restarting in 5 s…' });
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => {
+      if (!proc.running && !manualStop) proc.start(settings.data);
+    }, 5000);
+  }
+});
 
 function createWindow() {
   nativeTheme.themeSource = 'dark';
@@ -57,6 +75,20 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
+
+  // optional: begin receiving as soon as the app opens
+  if (!process.env.RTL433_SCREENSHOT_DIR) {
+    win.webContents.once('did-finish-load', () => {
+      if (settings && settings.data.autoStart) {
+        setTimeout(() => {
+          if (!proc.running && !demo.isRunning) {
+            if (demoMode) demo.start();
+            else proc.start(settings.data);
+          }
+        }, 800);
+      }
+    });
+  }
 
   // external links open in the default browser, never inside the app
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -114,14 +146,31 @@ app.on('before-quit', () => {
 
 // ---- IPC ----
 ipcMain.handle('rt:start', () => {
+  manualStop = false;
   if (demoMode) return demo.start();
   return proc.start(settings.data);
 });
 
 ipcMain.handle('rt:stop', () => {
+  manualStop = true;
+  clearTimeout(restartTimer);
   demo.stop();
   return proc.stop();
 });
+
+ipcMain.handle('rt:previewCmd', () => {
+  const bin = resolveBinary(settings.data.rtl433Path);
+  return [bin, ...buildArgs(settings.data)]
+    .map((a) => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a))
+    .join(' ');
+});
+
+ipcMain.handle('rt:copyText', (_e, text) => {
+  clipboard.writeText(String(text ?? ''));
+  return { ok: true };
+});
+
+ipcMain.handle('rt:version', () => app.getVersion());
 
 ipcMain.handle('rt:getStatus', () => ({ ...lastStatus, demoMode, running: proc.running || demo.isRunning }));
 

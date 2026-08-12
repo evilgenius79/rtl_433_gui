@@ -156,6 +156,16 @@ export function signalLevel(rssi) {
   return 1;
 }
 
+// HTML-escape any value derived from decoded RF data before it goes into
+// innerHTML — model/id/state strings are external input.
+export function esc(v) {
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export function parseEventTime(evt) {
   if (evt.time) {
     const t = Date.parse(String(evt.time).replace(' ', 'T'));

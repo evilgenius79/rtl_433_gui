@@ -3,6 +3,8 @@
 import { deviceKey, metricKeysOf, parseEventTime } from './format.js';
 
 const MAX_HISTORY_POINTS = 2000; // per device metric
+const STORAGE_KEY = 'rtl433.history.v1';
+const PERSIST_POINTS = 500; // per metric kept across restarts
 
 class Store {
   constructor() {
@@ -20,6 +22,62 @@ class Store {
     this._subs = new Map(); // topic -> Set<fn>
     this._pending = new Set();
     this._raf = null;
+    this._persistTimer = null;
+    this._restore();
+    window.addEventListener('pagehide', () => this.persist());
+  }
+
+  // ---- persistence: devices and their chart history survive restarts ----
+  _restore() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (!raw || !Array.isArray(raw.devices)) return;
+      for (const d of raw.devices) {
+        if (!d || !d.key) continue;
+        this.devices.set(d.key, {
+          key: d.key,
+          model: d.model || 'Unknown',
+          id: d.id,
+          channel: d.channel,
+          count: d.count || 0,
+          firstSeen: d.firstSeen || Date.now(),
+          lastSeen: d.lastSeen || 0,
+          lastEvent: d.lastEvent || {},
+          history: new Map(Object.entries(d.history || {})),
+        });
+      }
+    } catch (e) {
+      // corrupt storage: start clean
+    }
+  }
+
+  persist() {
+    try {
+      const devices = [...this.devices.values()].map((d) => ({
+        key: d.key,
+        model: d.model,
+        id: d.id,
+        channel: d.channel,
+        count: d.count,
+        firstSeen: d.firstSeen,
+        lastSeen: d.lastSeen,
+        lastEvent: d.lastEvent,
+        history: Object.fromEntries(
+          [...d.history.entries()].map(([k, pts]) => [k, pts.slice(-PERSIST_POINTS)])
+        ),
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), devices }));
+    } catch (e) {
+      // quota exceeded etc. — non-fatal
+    }
+  }
+
+  _schedulePersist() {
+    if (this._persistTimer) return;
+    this._persistTimer = setTimeout(() => {
+      this._persistTimer = null;
+      this.persist();
+    }, 15000);
   }
 
   on(topic, fn) {
@@ -82,6 +140,7 @@ class Store {
 
     this._notify('events');
     this._notify('devices');
+    this._schedulePersist();
   }
 
   addLog(entry) {
@@ -113,6 +172,11 @@ class Store {
     this.devices.clear();
     this.totalEvents = 0;
     this._eventTimes = [];
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      /* non-fatal */
+    }
     this._notify('events');
     this._notify('devices');
   }

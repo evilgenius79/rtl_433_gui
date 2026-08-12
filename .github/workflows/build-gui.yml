@@ -13,6 +13,16 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # main-process modules have no dependencies, so no npm install needed
+      - run: node --test "gui/test/*.test.js"
+
   # Cross-compile a fully static 64-bit rtl_433.exe from this repo's sources
   # so the GUI ships with a working receiver out of the box.
   rtl433-win64:

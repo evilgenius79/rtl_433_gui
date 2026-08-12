@@ -120,6 +120,31 @@ export async function initSettings() {
     </div>
 
     <div class="settings-card">
+      <h3>Behavior</h3>
+      <div class="card-sub">Startup, recovery and desktop notifications.</div>
+      <div class="form-row">
+        <div><div class="form-label">Start on launch</div>
+          <div class="form-hint">Begin receiving as soon as the app opens.</div></div>
+        <div class="form-field"><input type="checkbox" id="s-autostart" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Auto-restart receiver</div>
+          <div class="form-hint">If rtl_433 exits unexpectedly, relaunch it after 5 seconds.</div></div>
+        <div class="form-field"><input type="checkbox" id="s-autorestart" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Notify on new device</div>
+          <div class="form-hint">Desktop notification the first time an unseen device transmits.</div></div>
+        <div class="form-field"><input type="checkbox" id="s-notifynew" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Notify on low battery</div>
+          <div class="form-hint">Desktop notification (once per device) when a sensor reports low battery.</div></div>
+        <div class="form-field"><input type="checkbox" id="s-notifybatt" /></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
       <h3>Advanced</h3>
       <div class="card-sub">Appended verbatim to the rtl_433 command line.</div>
       <div class="form-row">
@@ -130,6 +155,7 @@ export async function initSettings() {
 
     <div class="settings-actions">
       <button class="btn btn-primary" id="s-save">Save settings</button>
+      <button class="btn" id="s-copycmd" title="Copy the exact rtl_433 command line built from the saved settings">Copy command line</button>
       <span class="save-note" id="s-note"></span>
     </div>
   </div>`;
@@ -147,6 +173,10 @@ export async function initSettings() {
   g('s-units').value = draft.units || 'si';
   g('s-level').checked = draft.reportLevel !== false;
   g('s-extra').value = draft.extraArgs || '';
+  g('s-autostart').checked = !!draft.autoStart;
+  g('s-autorestart').checked = !!draft.autoRestart;
+  g('s-notifynew').checked = !!draft.notifyNewDevice;
+  g('s-notifybatt').checked = draft.notifyLowBattery !== false;
 
   const presetHost = g('s-freq-presets');
   for (const p of FREQ_PRESETS) {
@@ -213,6 +243,10 @@ export async function initSettings() {
       units: g('s-units').value,
       reportLevel: g('s-level').checked,
       extraArgs: g('s-extra').value,
+      autoStart: g('s-autostart').checked,
+      autoRestart: g('s-autorestart').checked,
+      notifyNewDevice: g('s-notifynew').checked,
+      notifyLowBattery: g('s-notifybatt').checked,
     };
     store.settings = await window.rtl433.saveSettings(patch);
     draft = { ...store.settings };
@@ -221,6 +255,12 @@ export async function initSettings() {
     g('s-note').textContent = running ? 'Saved — stop & start the receiver to apply.' : 'Saved.';
     window.toast('Settings saved' + (running ? ' — restart the receiver to apply' : ''), 'success');
     setTimeout(() => (g('s-note').textContent = ''), 4000);
+  });
+
+  g('s-copycmd').addEventListener('click', async () => {
+    const cmd = await window.rtl433.previewCmd();
+    await window.rtl433.copyText(cmd);
+    window.toast('Copied: ' + (cmd.length > 96 ? cmd.slice(0, 96) + '…' : cmd), 'success');
   });
 
   function updateProtoSub() {

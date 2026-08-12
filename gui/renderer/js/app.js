@@ -1,7 +1,8 @@
 // App shell: navigation, top bar controls, IPC stream wiring.
 import { store } from './state.js';
-import { initDashboard } from './views/dashboard.js';
-import { initEvents } from './views/events.js';
+import { deviceKey, summarize } from './format.js';
+import { initDashboard, refreshDashboard } from './views/dashboard.js';
+import { initEvents, refreshEvents } from './views/events.js';
 import { initCharts, rerenderCharts } from './views/charts.js';
 import { initConsole } from './views/console.js';
 import { initSettings } from './views/settings.js';
@@ -27,7 +28,10 @@ function showView(name) {
   for (const btn of document.querySelectorAll('.nav-item')) {
     btn.classList.toggle('active', btn.dataset.view === name);
   }
+  // hidden views skip rendering; refresh the one that just became visible
   if (name === 'charts') rerenderCharts();
+  if (name === 'dashboard') refreshDashboard();
+  if (name === 'events') refreshEvents();
 }
 
 // ---- toasts ----
@@ -130,7 +134,26 @@ async function main() {
   });
 
   // IPC streams
-  window.rtl433.onEvent((evt) => store.addEvent(evt));
+  const batteryNotified = new Set(); // one low-battery notification per device per session
+  window.rtl433.onEvent((evt) => {
+    const key = deviceKey(evt);
+    const isNew = !store.devices.has(key);
+    store.addEvent(evt);
+    // desktop notifications (opt-in via Settings → Behavior)
+    const s = store.settings || {};
+    const name = `${evt.model || 'Unknown'}${evt.id != null ? ` #${evt.id}` : ''}`;
+    try {
+      if (isNew && s.notifyNewDevice) {
+        new Notification(`New device: ${name}`, { body: summarize(evt) || 'First transmission received' });
+      }
+      if (evt.battery_ok === 0 && s.notifyLowBattery && !batteryNotified.has(key)) {
+        batteryNotified.add(key);
+        new Notification(`Low battery: ${name}`, { body: 'This sensor is reporting a low battery.' });
+      }
+    } catch (e) {
+      /* notifications unavailable — non-fatal */
+    }
+  });
   window.rtl433.onLog((l) => store.addLog(l));
   window.rtl433.onStatus((s) => {
     store.setStatus(s);
@@ -147,6 +170,18 @@ async function main() {
   initSettings();
 
   updateStatusUI();
+
+  // version in the sidebar footer
+  try {
+    const v = await window.rtl433.getVersion();
+    const footer = document.querySelector('.sidebar-footer');
+    const tag = document.createElement('div');
+    tag.style.cssText = 'font-size:11px;color:var(--text-3);padding:6px 8px 0;';
+    tag.textContent = `v${v}`;
+    footer.appendChild(tag);
+  } catch (e) {
+    /* non-fatal */
+  }
 
   // keyboard shortcuts: Ctrl+1..5 switch views, Space toggles when not typing
   document.addEventListener('keydown', (e) => {

@@ -1,7 +1,7 @@
 // Minimal SVG time-series line chart.
 // Mark specs per the dataviz method: 2px lines, recessive hairline grid,
 // crosshair + shared tooltip, no dual axes (one unit family per chart).
-import { fmtValue, fmtClock } from './format.js';
+import { fmtValue, fmtClock, esc } from './format.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -161,7 +161,7 @@ export function renderLineChart(host, series, opts = {}) {
       dots[i].setAttribute('cx', x(p[0]));
       dots[i].setAttribute('cy', y(p[1]));
       dots[i].setAttribute('visibility', 'visible');
-      rows += `<div class="tr"><span class="sw" style="background:${s.color}"></span><span>${s.name}</span><span class="v">${fmtValue(s.key, p[1])}${opts.unit ? ' ' + opts.unit : ''}</span></div>`;
+      rows += `<div class="tr"><span class="sw" style="background:${s.color}"></span><span>${esc(s.name)}</span><span class="v">${esc(fmtValue(s.key, p[1]))}${opts.unit ? ' ' + esc(opts.unit) : ''}</span></div>`;
     });
 
     if (!rows) {

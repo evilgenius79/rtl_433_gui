@@ -2,7 +2,7 @@
 // (one axis per chart — never dual axes). Series colors follow the fixed
 // categorical order; a legend is shown whenever a chart has 2+ series.
 import { store } from '../state.js';
-import { labelOf, unitOf, deviceTitle } from '../format.js';
+import { labelOf, unitOf, deviceTitle, esc } from '../format.js';
 import { renderLineChart } from '../chart.js';
 
 const root = document.getElementById('view-charts');
@@ -99,7 +99,7 @@ function render() {
   // (re)build device options preserving selection
   devSel.innerHTML = '<option value="">All devices</option>' + devs.map((d) => {
     const label = `${deviceTitle(d)}${d.id != null ? ` #${d.id}` : ''}${d.channel != null && d.channel !== '' ? ` (CH ${d.channel})` : ''}`;
-    return `<option value="${d.key}">${label}</option>`;
+    return `<option value="${esc(d.key)}">${esc(label)}</option>`;
   }).join('');
   devSel.value = selDevice;
   if (devSel.value !== selDevice) {
@@ -130,7 +130,7 @@ function render() {
   const mSel = document.getElementById('ch-metric');
   mSel.innerHTML = '<option value="">Add / remove metric…</option>' + [...metrics.keys()].sort().map((k) => {
     const on = selMetrics.has(k);
-    return `<option value="${on ? '-' : '+'}${k}">${on ? '✓ ' : ''}${labelOf(k)}${unitOf(k) ? ` (${unitOf(k)})` : ''}</option>`;
+    return `<option value="${esc(on ? '-' + k : '+' + k)}">${on ? '✓ ' : ''}${esc(labelOf(k))}${unitOf(k) ? ` (${esc(unitOf(k))})` : ''}</option>`;
   }).join('');
 
   // Build one chart per selected metric. Series within a chart = devices.
@@ -162,11 +162,11 @@ function render() {
     const card = document.createElement('div');
     card.className = 'chart-card';
     const legend = series.length > 1
-      ? `<div class="chart-legend">${series.map((s) => `<span class="li"><span class="sw" style="background:${s.color}"></span>${s.name}</span>`).join('')}</div>`
+      ? `<div class="chart-legend">${series.map((s) => `<span class="li"><span class="sw" style="background:${s.color}"></span>${esc(s.name)}</span>`).join('')}</div>`
       : '';
     card.innerHTML = `
       <div class="chart-head">
-        <span class="chart-title">${labelOf(metric)}${unitOf(metric) ? ` — ${unitOf(metric)}` : ''}</span>
+        <span class="chart-title">${esc(labelOf(metric))}${unitOf(metric) ? ` — ${esc(unitOf(metric))}` : ''}</span>
         ${legend}
       </div>
       <div class="chart-svg-wrap"></div>

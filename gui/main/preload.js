@@ -14,8 +14,11 @@ contextBridge.exposeInMainWorld('rtl433', {
   pickBinary: () => ipcRenderer.invoke('rt:pickBinary'),
   getProtocols: () => ipcRenderer.invoke('rt:getProtocols'),
 
-  // data export
+  // data export & misc
   exportFile: (opts) => ipcRenderer.invoke('rt:exportFile', opts),
+  previewCmd: () => ipcRenderer.invoke('rt:previewCmd'),
+  copyText: (text) => ipcRenderer.invoke('rt:copyText', text),
+  getVersion: () => ipcRenderer.invoke('rt:version'),
 
   // streams (main -> renderer)
   onEvent: (cb) => ipcRenderer.on('rt:event', (_e, data) => cb(data)),

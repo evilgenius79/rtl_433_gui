@@ -111,7 +111,7 @@ const DEVICES = [
 class DemoSource extends EventEmitter {
   constructor() {
     super();
-    this.timers = [];
+    this.timers = new Set();
     this.running = false;
   }
 
@@ -134,17 +134,19 @@ class DemoSource extends EventEmitter {
           ? (dev.minPeriod || 30) + Math.random() * dev.period
           : jitter(dev.period, dev.period * 0.05);
         const t = setTimeout(() => {
+          this.timers.delete(t);
           this._emitFrom(dev);
           schedule();
         }, Math.max(400, (base * 1000) / SPEED));
-        this.timers.push(t);
+        this.timers.add(t);
       };
       // stagger initial transmissions across the first ~8 s so the UI fills fast
       const t0 = setTimeout(() => {
+        this.timers.delete(t0);
         this._emitFrom(dev);
         schedule();
       }, 300 + Math.random() * 8000);
-      this.timers.push(t0);
+      this.timers.add(t0);
     }
     return { ok: true };
   }
@@ -153,7 +155,9 @@ class DemoSource extends EventEmitter {
     if (!this.running) return;
     const rssi = jitter(-7, 3.5);
     const evt = {
-      time: new Date().toISOString().replace('T', ' ').replace('Z', ''),
+      // ISO with Z suffix, like rtl_433's "-M time:iso:usec:tz" — keeping the
+      // timezone marker means the renderer never mis-parses it as local time
+      time: new Date().toISOString(),
       ...dev.base,
       ...dev.fields(dev),
       mic: 'CHECKSUM',
@@ -171,7 +175,7 @@ class DemoSource extends EventEmitter {
   stop() {
     this.running = false;
     for (const t of this.timers) clearTimeout(t);
-    this.timers = [];
+    this.timers.clear();
     this.emit('log', { stream: 'app', line: 'demo mode stopped' });
     this.emit('status', { state: 'stopped', demo: true });
     return { ok: true };
