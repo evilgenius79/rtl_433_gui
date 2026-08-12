@@ -1,19 +1,17 @@
-name: Build GUI
+name: Release GUI
 
+# Pushing a tag like gui-v0.1.0 builds the Windows installer and publishes
+# it as a GitHub Release with the .exe attached.
 on:
   push:
-    branches:
-      - "**"
-    paths:
-      - "gui/**"
-      - ".github/workflows/build-gui.yml"
-  pull_request:
-    paths:
-      - "gui/**"
-  workflow_dispatch:
+    tags:
+      - "gui-v*"
+
+permissions:
+  contents: write
 
 jobs:
-  windows-installer:
+  release:
     runs-on: windows-latest
     defaults:
       run:
@@ -29,11 +27,12 @@ jobs:
         run: npm ci
       - name: Build Windows installer
         run: npm run dist
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
         with:
-          name: rtl_433-gui-windows
-          path: |
+          files: |
             gui/dist/*.exe
             gui/dist/*.zip
-          if-no-files-found: error
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
