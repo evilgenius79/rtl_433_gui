@@ -1,11 +1,14 @@
 name: Release GUI
 
-# Pushing a tag like gui-v0.1.0 builds the Windows installer and publishes
-# it as a GitHub Release with the .exe attached.
+# Pushing a tag like gui-v0.1.0 — or dispatching this workflow manually —
+# builds the Windows installer and publishes it as a GitHub Release with the
+# .exe attached. On manual dispatch the tag is created from gui/package.json's
+# version.
 on:
   push:
     tags:
       - "gui-v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,9 +30,14 @@ jobs:
         run: npm ci
       - name: Build Windows installer
         run: npm run dist
+      - name: Read GUI version
+        id: ver
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('gui-v{0}', steps.ver.outputs.version) }}
           files: |
             gui/dist/*.exe
             gui/dist/*.zip
