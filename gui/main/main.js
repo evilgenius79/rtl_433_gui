@@ -41,7 +41,9 @@ function createWindow() {
     ...(process.platform === 'win32'
       ? {
           titleBarStyle: 'hidden',
-          titleBarOverlay: { color: '#14161b', symbolColor: '#aab2c0', height: 40 },
+          // height matches the .topbar so the caption buttons align with it;
+          // the topbar reserves their width via env(titlebar-area-width)
+          titleBarOverlay: { color: '#0f1116', symbolColor: '#a7afbd', height: 56 },
         }
       : {}),
     webPreferences: {

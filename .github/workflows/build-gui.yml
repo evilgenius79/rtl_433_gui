@@ -13,13 +13,36 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Cross-compile a fully static 64-bit rtl_433.exe from this repo's sources
+  # so the GUI ships with a working receiver out of the box.
+  rtl433-win64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW toolchain
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get install -q -y gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev p7zip-full cmake
+      - name: Build static rtl_433.exe
+        run: ./gui/scripts/build-rtl433-win64.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rtl433-win64
+          path: gui/vendor/rtl_433/
+          if-no-files-found: error
+
   windows-installer:
+    needs: rtl433-win64
     runs-on: windows-latest
     defaults:
       run:
         working-directory: gui
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rtl433-win64
+          path: gui/vendor/rtl_433/
       - uses: actions/setup-node@v4
         with:
           node-version: 22

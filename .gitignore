@@ -45,3 +45,5 @@ include/version.h
 # GUI (Electron app in gui/)
 gui/node_modules/
 gui/dist/
+gui/vendor/
+gui/.win-build/

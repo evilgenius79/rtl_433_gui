@@ -1,7 +1,7 @@
 {
   "name": "rtl433-gui",
   "productName": "rtl_433 GUI",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Desktop GUI for rtl_433 - live dashboard, event log and charts for 433/868/915 MHz sensor traffic",
   "main": "main/main.js",
   "license": "GPL-2.0-or-later",
@@ -26,6 +26,13 @@
     "directories": {
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "vendor/rtl_433",
+        "to": "rtl_433",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": [
         {

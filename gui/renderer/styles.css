@@ -165,7 +165,9 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--bg-page);
   -webkit-app-region: drag;
-  padding-right: calc(18px + env(titlebar-area-x, 0px));
+  /* keep controls clear of the Windows caption buttons: reserve the space to
+     the right of the titlebar area (falls back to 18px where env() is unset) */
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 18px)));
 }
 .topbar button, .topbar .status-pill, .topbar .freq-chip { -webkit-app-region: no-drag; }
 

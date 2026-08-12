@@ -1,9 +1,9 @@
 name: Release GUI
 
 # Pushing a tag like gui-v0.1.0 — or dispatching this workflow manually —
-# builds the Windows installer and publishes it as a GitHub Release with the
-# .exe attached. On manual dispatch the tag is created from gui/package.json's
-# version.
+# builds the Windows installer (with a bundled rtl_433.exe cross-compiled from
+# this repo's sources) and publishes it as a GitHub Release. On manual
+# dispatch the tag is created from gui/package.json's version.
 on:
   push:
     tags:
@@ -14,13 +14,34 @@ permissions:
   contents: write
 
 jobs:
+  rtl433-win64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW toolchain
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get install -q -y gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev p7zip-full cmake
+      - name: Build static rtl_433.exe
+        run: ./gui/scripts/build-rtl433-win64.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rtl433-win64
+          path: gui/vendor/rtl_433/
+          if-no-files-found: error
+
   release:
+    needs: rtl433-win64
     runs-on: windows-latest
     defaults:
       run:
         working-directory: gui
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rtl433-win64
+          path: gui/vendor/rtl_433/
       - uses: actions/setup-node@v4
         with:
           node-version: 22

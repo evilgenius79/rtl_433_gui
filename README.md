@@ -10,10 +10,12 @@ output into a live signal console.
 ## Download
 
 Grab **`rtl_433 GUI Setup <version>.exe`** (or the portable `.zip`) from the
-[**Releases**](../../releases) page and run it. If `rtl_433.exe` isn't on your
-`PATH`, point **Settings → Receiver** at it — or just flip on **Demo mode** in
-the sidebar to explore the app with simulated sensor traffic, no SDR dongle or
-rtl_433 install needed.
+[**Releases**](../../releases) page and run it. A statically linked
+`rtl_433.exe` built from this repository is **bundled with the app** — nothing
+else to install. Plug in your RTL-SDR dongle (install its WinUSB driver once
+with [Zadig](https://zadig.akeo.ie/) if needed) and press **Start** — or flip
+on **Demo mode** in the sidebar to explore the app with simulated sensor
+traffic, no hardware needed.
 
 ## What you get
 

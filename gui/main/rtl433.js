@@ -10,6 +10,10 @@ const path = require('path');
 function candidateBinaries() {
   const exe = process.platform === 'win32' ? 'rtl_433.exe' : 'rtl_433';
   const cands = [];
+  // the copy bundled with the app (extraResources in packaged builds,
+  // gui/vendor in a from-source checkout)
+  cands.push(path.join(process.resourcesPath || '.', 'rtl_433', exe));
+  cands.push(path.join(__dirname, '..', 'vendor', 'rtl_433', exe));
   if (process.platform === 'win32') {
     const pf = process.env['ProgramFiles'];
     const pf86 = process.env['ProgramFiles(x86)'];
@@ -17,7 +21,7 @@ function candidateBinaries() {
     if (pf86) cands.push(path.join(pf86, 'rtl_433', exe));
     cands.push(path.join('C:\\rtl_433', exe));
   }
-  // A copy dropped next to the app resources (portable bundles).
+  // a copy dropped next to the app resources (portable bundles)
   cands.push(path.join(process.resourcesPath || '.', exe));
   cands.push(exe); // finally: rely on PATH
   return cands;

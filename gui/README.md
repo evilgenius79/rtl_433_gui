@@ -61,12 +61,22 @@ installer on every push that touches `gui/`, uploading it as a build artifact �
 and pushing a tag like **`gui-v0.1.0`** publishes it automatically as a GitHub
 Release with the `.exe` attached.
 
-The app looks for `rtl_433.exe` in this order:
+### Bundled rtl_433.exe
+
+Installer and zip builds **ship with a statically linked `rtl_433.exe`**
+cross-compiled from this repository's own sources
+(`gui/scripts/build-rtl433-win64.sh`, run automatically in CI) — no separate
+rtl_433 install is needed. The app looks for `rtl_433.exe` in this order:
 
 1. the path configured in **Settings → Receiver**,
-2. `%ProgramFiles%\rtl_433\rtl_433.exe` (and `C:\rtl_433\rtl_433.exe`),
-3. next to the app's resources (drop a copy there for a portable bundle),
-4. `rtl_433` on the `PATH`.
+2. the bundled copy (`resources/rtl_433/rtl_433.exe`, or `gui/vendor/rtl_433/`
+   when running from source),
+3. `%ProgramFiles%\rtl_433\rtl_433.exe` (and `C:\rtl_433\rtl_433.exe`),
+4. next to the app's resources,
+5. `rtl_433` on the `PATH`.
+
+Note: your RTL-SDR dongle still needs the WinUSB driver — install it once with
+[Zadig](https://zadig.akeo.ie/) if rtl_433 reports no device found.
 
 ## Development notes
 
