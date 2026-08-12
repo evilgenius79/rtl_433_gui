@@ -10,6 +10,10 @@ in the wiki.
 For more documentation and related projects, particularly those that
 help with rtl_433 development, see the https://triq.org/ site.
 
+**This fork adds a desktop GUI** — a live dashboard, event log, charts and full
+settings for rtl_433, packaged as a Windows installer. See [gui/](gui/) for
+screenshots, downloads and build instructions.
+
 It works with [RTL-SDR](https://github.com/osmocom/rtl-sdr/) and/or [SoapySDR](https://github.com/pothosware/SoapySDR/).
 Actively tested and supported are Realtek RTL2832 based DVB dongles (using RTL-SDR) and LimeSDR ([LimeSDR USB](https://www.crowdsupply.com/lime-micro/limesdr) and [LimeSDR mini](https://www.crowdsupply.com/lime-micro/limesdr-mini) engineering samples kindly provided by [MyriadRf](https://myriadrf.org/)), PlutoSDR, HackRF One (using SoapySDR drivers), as well as SoapyRemote.
 
