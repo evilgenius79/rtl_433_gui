@@ -1,3 +1,58 @@
+# rtl_433 GUI
+
+**This fork adds a polished desktop GUI for rtl_433** — a live sensor dashboard,
+event log, time-series charts and full receiver settings, packaged as a Windows
+installer. The GUI wraps the `rtl_433` command-line receiver and turns its JSON
+output into a live signal console.
+
+![rtl_433 GUI dashboard](gui/docs/dashboard.png)
+
+## Download
+
+Grab **`rtl_433 GUI Setup <version>.exe`** (or the portable `.zip`) from the
+[**Releases**](../../releases) page and run it. If `rtl_433.exe` isn't on your
+`PATH`, point **Settings → Receiver** at it — or just flip on **Demo mode** in
+the sidebar to explore the app with simulated sensor traffic, no SDR dongle or
+rtl_433 install needed.
+
+## What you get
+
+**Live dashboard** — every device heard appears as a card with its headline
+reading (temperature, moisture, pressure…), secondary readings, a sparkline
+history, signal-strength bars, a low-battery badge, transmission count and
+last-seen age. Stat tiles track total events, devices seen, events/min and
+session time. Click any card to jump to its charts.
+
+**Event log** — every decoded transmission in a filterable, pausable table
+(free-text search plus a per-model filter). Click a row to expand the raw JSON.
+Export the log as CSV or NDJSON.
+
+![event log](gui/docs/events.png)
+
+**Charts** — plot any recorded metric over time (15 min / 1 h / 6 h / all),
+overlaying up to three devices per chart with crosshair tooltips. One chart per
+metric, so different units never share an axis.
+
+![charts](gui/docs/charts.png)
+
+**Full receiver settings** — SDR device selection, frequency with band presets
+(433.92 / 868.3 / 915 / 315 MHz) and multi-frequency hopping, sample rate,
+gain, PPM correction, metric/US units, and per-protocol decoder toggles for all
+378 rtl_433 protocols with search. A free-form field passes any extra
+arguments straight through, and the exact command line used is always visible
+in the Console view.
+
+![settings](gui/docs/settings.png)
+
+**Console** — the raw rtl_433 stderr stream with timestamps, for
+troubleshooting driver, gain or decoder issues.
+
+See [gui/](gui/) for build instructions and development notes. The GUI runs
+`rtl_433 -F json` as a managed child process; settings map 1:1 onto rtl_433
+command-line options.
+
+---
+
 # rtl_433
 
 rtl_433 (despite the name) is a generic data receiver, mainly for the 433.92 MHz, 868 MHz (SRD), 315 MHz, 345 MHz, and 915 MHz ISM bands.
@@ -9,10 +64,6 @@ rtl_433](https://github.com/merbanan/rtl_433/wiki/Built-with-rtl_433!)
 in the wiki.
 For more documentation and related projects, particularly those that
 help with rtl_433 development, see the https://triq.org/ site.
-
-**This fork adds a desktop GUI** — a live dashboard, event log, charts and full
-settings for rtl_433, packaged as a Windows installer. See [gui/](gui/) for
-screenshots, downloads and build instructions.
 
 It works with [RTL-SDR](https://github.com/osmocom/rtl-sdr/) and/or [SoapySDR](https://github.com/pothosware/SoapySDR/).
 Actively tested and supported are Realtek RTL2832 based DVB dongles (using RTL-SDR) and LimeSDR ([LimeSDR USB](https://www.crowdsupply.com/lime-micro/limesdr) and [LimeSDR mini](https://www.crowdsupply.com/lime-micro/limesdr-mini) engineering samples kindly provided by [MyriadRf](https://myriadrf.org/)), PlutoSDR, HackRF One (using SoapySDR drivers), as well as SoapyRemote.
