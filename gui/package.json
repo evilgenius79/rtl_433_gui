@@ -1,0 +1,56 @@
+{
+  "name": "rtl433-gui",
+  "productName": "rtl_433 GUI",
+  "version": "0.1.0",
+  "description": "Desktop GUI for rtl_433 - live dashboard, event log and charts for 433/868/915 MHz sensor traffic",
+  "main": "main/main.js",
+  "license": "GPL-2.0-or-later",
+  "author": "rtl_433 GUI contributors",
+  "scripts": {
+    "start": "electron .",
+    "start:demo": "electron . --demo",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "org.rtl433.gui",
+    "productName": "rtl_433 GUI",
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "data/**/*",
+      "demo/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "rtl_433 GUI"
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.2.1",
+    "electron-builder": "^26.15.3"
+  }
+}

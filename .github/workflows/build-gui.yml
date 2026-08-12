@@ -1,0 +1,50 @@
+name: Build GUI
+
+on:
+  push:
+    paths:
+      - "gui/**"
+      - ".github/workflows/build-gui.yml"
+    tags:
+      - "gui-v*"
+  pull_request:
+    paths:
+      - "gui/**"
+  workflow_dispatch:
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: gui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Windows installer
+        run: npm run dist
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtl_433-gui-windows
+          path: |
+            gui/dist/*.exe
+            gui/dist/*.zip
+          if-no-files-found: error
+      # Pushing a tag like gui-v0.1.0 publishes the installer as a GitHub Release
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/gui-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            gui/dist/*.exe
+            gui/dist/*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

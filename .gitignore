@@ -41,3 +41,7 @@ cmake-build-debug/
 
 # Dynamically generated files
 include/version.h
+
+# GUI (Electron app in gui/)
+gui/node_modules/
+gui/dist/

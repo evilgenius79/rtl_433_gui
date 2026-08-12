@@ -1,0 +1,181 @@
+// Dashboard: stat tiles + live device cards.
+import { store } from '../state.js';
+import {
+  pickPrimary, labelOf, unitOf, fmtValue, fmtValueUnit, metricKeysOf,
+  fmtAgo, fmtUptime, signalLevel, deviceTitle,
+} from '../format.js';
+import { renderSparkline } from '../chart.js';
+import { focusDevice } from './charts.js';
+
+const root = document.getElementById('view-dashboard');
+const cardEls = new Map(); // device key -> element
+let lastFlash = new Map();
+
+function statTile(id, label, icon) {
+  return `<div class="stat-tile">
+    <div class="stat-label">${icon}${label}</div>
+    <div class="stat-value" id="stat-${id}">—</div>
+    <div class="stat-sub" id="stat-${id}-sub"></div>
+  </div>`;
+}
+
+const ICONS = {
+  events: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4.1 12.5H11L9.5 22 19 10.5h-7z"/></svg>',
+  devices: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/></svg>',
+  rate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 3 6-8"/></svg>',
+  uptime: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+};
+
+export function initDashboard() {
+  root.innerHTML = `
+    <div class="stat-row">
+      ${statTile('events', 'Events received', ICONS.events)}
+      ${statTile('devices', 'Devices seen', ICONS.devices)}
+      ${statTile('rate', 'Events / min', ICONS.rate)}
+      ${statTile('uptime', 'Session', ICONS.uptime)}
+    </div>
+    <div class="section-head">
+      <h2 class="section-title">Live devices</h2>
+      <span class="section-sub" id="dash-devcount"></span>
+    </div>
+    <div class="device-grid" id="device-grid"></div>
+    <div class="empty-state" id="dash-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
+      <div class="big">No transmissions yet</div>
+      <div class="small">Press <b>Start</b> to begin receiving. Devices appear here automatically as their transmissions are decoded — or flip on <b>Demo mode</b> in the sidebar to explore with simulated traffic.</div>
+    </div>`;
+
+  store.on('devices', renderDevices);
+  store.on('status', renderStats);
+  setInterval(renderStats, 1000);
+  setInterval(renderRelativeTimes, 5000);
+  renderDevices();
+  renderStats();
+}
+
+function renderStats() {
+  const set = (id, v, sub) => {
+    const e = document.getElementById(`stat-${id}`);
+    const s = document.getElementById(`stat-${id}-sub`);
+    if (e) e.textContent = v;
+    if (s && sub != null) s.textContent = sub;
+  };
+  set('events', store.totalEvents.toLocaleString(), store.events.length ? `${store.events.length.toLocaleString()} in log` : ' ');
+  set('devices', String(store.devices.size), ' ');
+  set('rate', String(store.eventsPerMinute()), 'last 60 s');
+  set('uptime', store.startedAt ? fmtUptime(Date.now() - store.startedAt) : '—',
+    store.status.state === 'running' ? (store.status.demo ? 'demo mode' : 'receiving') : 'stopped');
+}
+
+function batteryBadge(evt) {
+  if (evt.battery_ok === 0) {
+    return `<span class="batt-warn" title="Sensor reports low battery">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="16" height="8" rx="2"/><path d="M20 11v2"/><path d="M6 12h4"/></svg>Low batt</span>`;
+  }
+  return '';
+}
+
+function cardHtml(dev) {
+  const evt = dev.lastEvent;
+  const primary = pickPrimary(evt);
+  const chips = [];
+  if (evt.id != null) chips.push(`<span class="chip" title="Device ID">ID ${evt.id}</span>`);
+  if (evt.channel != null && evt.channel !== '') chips.push(`<span class="chip" title="Channel">CH ${evt.channel}</span>`);
+
+  let primaryHtml = '';
+  if (primary != null) {
+    primaryHtml = `<div class="device-primary" title="${labelOf(primary)}">
+      <span class="val">${fmtValue(primary, evt[primary])}</span>
+      <span class="unit">${unitOf(primary) || labelOf(primary)}</span>
+    </div>`;
+  } else {
+    const state = evt.state || evt.event || evt.code || '—';
+    primaryHtml = `<div class="device-primary"><span class="val" style="font-size:20px">${String(state).slice(0, 18)}</span></div>`;
+  }
+
+  const secondary = metricKeysOf(evt)
+    .filter((k) => k !== primary)
+    .slice(0, 3)
+    .map((k) => `<div class="kv"><span class="k">${labelOf(k)}</span><span class="v">${fmtValueUnit(k, evt[k])}</span></div>`)
+    .join('');
+
+  const lvl = signalLevel(evt.rssi);
+  return `
+    <div class="device-head">
+      <div class="device-name" title="${deviceTitle(dev)}">${deviceTitle(dev)}</div>
+      <div class="device-chips">${chips.join('')}</div>
+    </div>
+    ${primaryHtml}
+    <div class="device-secondary">${secondary || '<span class="k" style="color:var(--text-3);font-size:12px">no numeric readings</span>'}</div>
+    <div class="spark" data-spark></div>
+    <div class="device-foot">
+      <span class="sig" data-level="${lvl}" title="RSSI ${evt.rssi ?? '—'} dB"><i></i><i></i><i></i><i></i></span>
+      ${evt.rssi != null ? `<span>${evt.rssi.toFixed(0)} dB</span>` : ''}
+      ${batteryBadge(evt)}
+      <span class="spacer"></span>
+      <span data-ago title="${dev.count} transmissions">${fmtAgo(Date.now() - dev.lastSeen)} · ${dev.count}×</span>
+    </div>`;
+}
+
+function renderDevices() {
+  const grid = document.getElementById('device-grid');
+  const empty = document.getElementById('dash-empty');
+  const devs = [...store.devices.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+
+  empty.hidden = devs.length > 0;
+  document.getElementById('dash-devcount').textContent = devs.length
+    ? `${devs.length} device${devs.length > 1 ? 's' : ''}, sorted by last transmission`
+    : '';
+
+  const seen = new Set();
+  for (const dev of devs) {
+    seen.add(dev.key);
+    let elCard = cardEls.get(dev.key);
+    if (!elCard) {
+      elCard = document.createElement('div');
+      elCard.className = 'device-card';
+      elCard.title = 'Click to chart this device';
+      const key = dev.key;
+      elCard.addEventListener('click', () => {
+        focusDevice(key);
+        window.showView('charts');
+      });
+      cardEls.set(dev.key, elCard);
+    }
+    elCard.innerHTML = cardHtml(dev);
+    grid.appendChild(elCard); // re-append reorders by recency
+
+    // flash on fresh data
+    const prev = lastFlash.get(dev.key);
+    if (prev !== dev.count) {
+      lastFlash.set(dev.key, dev.count);
+      if (prev != null) {
+        elCard.classList.remove('flash');
+        void elCard.offsetWidth; // restart animation
+        elCard.classList.add('flash');
+      }
+    }
+
+    const primary = pickPrimary(dev.lastEvent);
+    const sparkHost = elCard.querySelector('[data-spark]');
+    if (primary && dev.history.get(primary)?.length > 1) {
+      renderSparkline(sparkHost, dev.history.get(primary), 'var(--series-1)', null);
+    }
+  }
+  // drop cards for devices no longer present (after clear)
+  for (const [key, elCard] of cardEls) {
+    if (!seen.has(key)) {
+      elCard.remove();
+      cardEls.delete(key);
+      lastFlash.delete(key);
+    }
+  }
+}
+
+function renderRelativeTimes() {
+  for (const [key, elCard] of cardEls) {
+    const dev = store.devices.get(key);
+    const span = elCard.querySelector('[data-ago]');
+    if (dev && span) span.textContent = `${fmtAgo(Date.now() - dev.lastSeen)} · ${dev.count}×`;
+  }
+}
