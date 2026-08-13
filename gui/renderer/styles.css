@@ -777,7 +777,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
   box-shadow: var(--shadow-card);
   background: #10131a;
 }
-#air-map { position: absolute; inset: 0; background: #10131a; }
+#air-map, #sd-map { position: absolute; inset: 0; background: #10131a; }
 
 /* dark-mode map: invert the raster tiles, then tame the colors */
 .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.35); }
@@ -863,6 +863,19 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 }
 .air-row-sub .age { margin-left: auto; color: var(--text-3); }
 .air-list-empty { padding: 30px 10px; text-align: center; color: var(--text-3); font-size: 12.5px; }
+
+/* pager table + sonde panel */
+.etable .t-msg { white-space: normal; word-break: break-word; max-width: 560px; }
+.sd-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sd-kv span:first-child { color: var(--text-3); }
+.sd-kv span:last-child { font-variant-numeric: tabular-nums; font-weight: 550; }
 
 /* topbar mode select */
 .mode-select {

@@ -49,7 +49,7 @@ class AdsbSource extends EventEmitter {
     if (this.child) return { ok: false, error: 'already running' };
     const bin = resolveBinary(settings.adsbPath);
     const args = [];
-    if (settings.device) args.push('-d', String(settings.device));
+    if (settings.adsbDevice) args.push('-d', String(settings.adsbDevice));
     if (settings.adsbGain !== '' && settings.adsbGain != null) args.push('-g', String(settings.adsbGain));
     if (settings.ppmError) args.push('-p', String(settings.ppmError));
 

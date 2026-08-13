@@ -25,9 +25,20 @@ const DEFAULTS = {
   autoRestart: false, // relaunch rtl_433 if it exits unexpectedly
   notifyNewDevice: false, // desktop notification when an unseen device appears
   notifyLowBattery: true, // desktop notification when a sensor reports low battery
-  receiverMode: 'ism', // ism (rtl_433) | adsb (rtl_adsb aircraft)
+  receiverMode: 'ism', // mode the top-bar button controls: ism | adsb | pocsag | sonde
+  // Per-mode SDR device selection: with several dongles, give each running
+  // mode its own index/serial. Empty = first device.
+  adsbDevice: '',
   adsbPath: '', // rtl_adsb binary override; empty = bundled copy
   adsbGain: '', // -g for rtl_adsb; empty = default
+  pagerDevice: '',
+  pagerFreq: '169.65M', // POCSAG frequency (regional; presets in Settings)
+  pagerGain: '',
+  sondeDevice: '',
+  sondeFreq: '402.7M', // RS41 radiosonde frequency (400.05-406 MHz band)
+  sondeGain: '',
+  rtlFmPath: '', // rtl_fm binary override; empty = bundled copy
+  rs41Path: '', // rs41mod binary override; empty = bundled copy
 };
 
 class Settings {

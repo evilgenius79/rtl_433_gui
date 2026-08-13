@@ -5,6 +5,8 @@ import { initDashboard, refreshDashboard } from './views/dashboard.js';
 import { initEvents, refreshEvents } from './views/events.js';
 import { initCharts, rerenderCharts } from './views/charts.js';
 import { initAircraft, refreshAircraft } from './views/aircraft.js';
+import { initPagers, refreshPagers } from './views/pagers.js';
+import { initSonde, refreshSonde } from './views/sonde.js';
 import { initConsole } from './views/console.js';
 import { initSettings } from './views/settings.js';
 
@@ -13,9 +15,16 @@ const VIEW_TITLES = {
   events: 'Events',
   charts: 'Charts',
   aircraft: 'Aircraft',
+  pagers: 'Pagers',
+  sonde: 'Radiosonde',
   console: 'Console',
   settings: 'Settings',
 };
+
+const MODE_NAMES = { ism: 'ISM', adsb: 'ADS-B', pocsag: 'Pagers', sonde: 'Sonde' };
+const MODE_HOME_VIEW = { ism: 'dashboard', adsb: 'aircraft', pocsag: 'pagers', sonde: 'sonde' };
+// which device-setting key each mode's pipeline uses (for conflict warnings)
+const MODE_DEVICE_KEY = { ism: 'device', adsb: 'adsbDevice', pocsag: 'pagerDevice', sonde: 'sondeDevice' };
 
 let currentView = 'dashboard';
 
@@ -35,6 +44,8 @@ function showView(name) {
   if (name === 'dashboard') refreshDashboard();
   if (name === 'events') refreshEvents();
   if (name === 'aircraft') refreshAircraft();
+  if (name === 'pagers') refreshPagers();
+  if (name === 'sonde') refreshSonde();
 }
 
 // ---- toasts ----
@@ -52,6 +63,8 @@ window.toast = (msg, kind = '') => {
 };
 
 // ---- top bar ----
+// The pill summarizes every running pipeline; the button controls only the
+// mode currently selected in the dropdown (so a 2nd dongle can run another).
 function updateStatusUI() {
   const pill = document.getElementById('status-pill');
   const text = document.getElementById('status-text');
@@ -60,56 +73,81 @@ function updateStatusUI() {
   const iconPlay = document.getElementById('icon-play');
   const iconStop = document.getElementById('icon-stop');
 
-  const s = store.status;
-  const running = s.state === 'running';
-  const modeTag = s.mode === 'adsb' ? ' ADS-B' : '';
-  pill.className = `status-pill ${s.state === 'error' ? 'error' : running ? 'running' : 'stopped'}`;
-  text.textContent = running
-    ? `Receiving${modeTag}${s.demo ? ' · demo' : ''}`
-    : s.state === 'error' ? 'Error' : 'Stopped';
-  btnText.textContent = running ? 'Stop' : 'Start';
-  btn.classList.toggle('btn-primary', !running);
-  btn.classList.toggle('btn-danger', running);
+  const selected = store.settings?.receiverMode || 'ism';
+  const selectedStatus = store.modeStatus[selected] || { state: 'stopped' };
+  const selRunning = selectedStatus.state === 'running';
+  const running = store.runningModes();
+  const anyDemo = running.some((m) => store.modeStatus[m]?.demo);
+
+  if (running.length) {
+    pill.className = 'status-pill running';
+    text.textContent = `Receiving ${running.map((m) => MODE_NAMES[m] || m).join(' + ')}${anyDemo ? ' · demo' : ''}`;
+  } else if (selectedStatus.state === 'error') {
+    pill.className = 'status-pill error';
+    text.textContent = 'Error';
+  } else {
+    pill.className = 'status-pill stopped';
+    text.textContent = 'Stopped';
+  }
+
+  btnText.textContent = selRunning ? `Stop ${MODE_NAMES[selected]}` : `Start ${MODE_NAMES[selected]}`;
+  btn.classList.toggle('btn-primary', !selRunning);
+  btn.classList.toggle('btn-danger', selRunning);
   // note: SVG elements ignore the `hidden` attribute — toggle display instead
-  iconPlay.style.display = running ? 'none' : '';
-  iconStop.style.display = running ? '' : 'none';
-  // the receiver mode can't change while running
-  document.getElementById('mode-select').disabled = running;
+  iconPlay.style.display = selRunning ? 'none' : '';
+  iconStop.style.display = selRunning ? '' : 'none';
+}
+
+function fmtFreq(f) {
+  const s = String(f).trim();
+  const m = s.match(/^([\d.]+)\s*([MkG]?)/i);
+  if (!m) return s;
+  let mhz = parseFloat(m[1]);
+  const suf = m[2].toUpperCase();
+  if (suf === 'K') mhz /= 1000;
+  else if (suf === 'G') mhz *= 1000;
+  else if (!suf) mhz /= 1e6;
+  return `${+mhz.toFixed(3)} MHz`;
 }
 
 window.updateFreqChip = () => {
-  const adsbActive =
-    (store.status.state === 'running' && store.status.mode === 'adsb') ||
-    (store.settings?.receiverMode || 'ism') === 'adsb';
-  if (adsbActive) {
-    document.getElementById('freq-chip-text').textContent = '1090 MHz';
-    return;
+  const mode = store.settings?.receiverMode || 'ism';
+  let text = '—';
+  if (mode === 'adsb') {
+    text = '1090 MHz';
+  } else if (mode === 'pocsag') {
+    text = fmtFreq(store.settings?.pagerFreq || '169.65M');
+  } else if (mode === 'sonde') {
+    text = fmtFreq(store.settings?.sondeFreq || '402.7M');
+  } else {
+    const freqs = store.settings?.frequencies?.filter((f) => String(f).trim()) || [];
+    if (freqs.length) text = freqs.map(fmtFreq).join(' ⇄ ');
   }
-  const freqs = store.settings?.frequencies?.filter((f) => String(f).trim()) || [];
-  const fmt = (f) => {
-    const s = String(f).trim();
-    const m = s.match(/^([\d.]+)\s*([MkG]?)/i);
-    if (!m) return s;
-    let mhz = parseFloat(m[1]);
-    const suf = m[2].toUpperCase();
-    if (suf === 'K') mhz /= 1000;
-    else if (suf === 'G') mhz *= 1000;
-    else if (!suf) mhz /= 1e6;
-    return `${+mhz.toFixed(3)} MHz`;
-  };
-  document.getElementById('freq-chip-text').textContent = freqs.length
-    ? freqs.map(fmt).join(' ⇄ ')
-    : '—';
+  document.getElementById('freq-chip-text').textContent = text;
 };
 
 async function toggleStartStop() {
   const btn = document.getElementById('btn-startstop');
+  const mode = store.settings?.receiverMode || 'ism';
   btn.disabled = true;
   try {
-    if (store.status.state === 'running') {
-      await window.rtl433.stop();
+    if (store.modeStatus[mode]?.state === 'running') {
+      await window.rtl433.stop(mode);
     } else {
-      const res = await window.rtl433.start();
+      // one dongle can't serve two modes: warn when the device is already used
+      if (!store.demoMode) {
+        const myDev = String(store.settings[MODE_DEVICE_KEY[mode]] || '0');
+        const clash = store.runningModes().find(
+          (m) => !store.modeStatus[m]?.demo && String(store.settings[MODE_DEVICE_KEY[m]] || '0') === myDev
+        );
+        if (clash) {
+          window.toast(
+            `SDR device ${myDev} is already used by ${MODE_NAMES[clash]} — give ${MODE_NAMES[mode]} its own dongle in Settings, or stop ${MODE_NAMES[clash]} first.`,
+            'error'
+          );
+        }
+      }
+      const res = await window.rtl433.start(mode);
       if (res && res.ok === false && res.error) window.toast(res.error, 'error');
     }
   } finally {
@@ -130,7 +168,7 @@ async function main() {
 
   document.getElementById('btn-startstop').addEventListener('click', toggleStartStop);
 
-  // receiver mode select
+  // receiver mode select: picks which pipeline the Start/Stop button controls
   const modeSelect = document.getElementById('mode-select');
   modeSelect.value = store.settings.receiverMode || 'ism';
   modeSelect.addEventListener('change', async () => {
@@ -142,15 +180,16 @@ async function main() {
     }
     store.settings.receiverMode = res.mode;
     window.updateFreqChip();
-    showView(res.mode === 'adsb' ? 'aircraft' : 'dashboard');
-    window.toast(res.mode === 'adsb'
-      ? 'ADS-B mode — Start will tune 1090 MHz and track aircraft.'
-      : 'ISM mode — Start will run rtl_433 for sensor traffic.');
+    updateStatusUI();
+    showView(MODE_HOME_VIEW[res.mode] || 'dashboard');
   });
 
   // demo toggle
   const demoToggle = document.getElementById('demo-toggle');
   const status = await window.rtl433.getStatus();
+  if (status.modes) {
+    for (const [m, s] of Object.entries(status.modes)) store.modeStatus[m] = s;
+  }
   demoToggle.checked = !!status.demoMode;
   store.demoMode = !!status.demoMode;
   demoToggle.addEventListener('change', async () => {
@@ -196,16 +235,22 @@ async function main() {
   });
   store.on('status', updateStatusUI);
 
+  // pager stream
+  window.rtl433.onPager((msg) => store.addPagerMessage(msg));
+
   // views
   initDashboard();
   initEvents();
   initCharts();
   initAircraft();
+  initPagers();
+  initSonde();
   initConsole();
   initSettings();
 
   // land on the view matching the saved receiver mode
-  if ((store.settings.receiverMode || 'ism') === 'adsb') showView('aircraft');
+  const homeView = MODE_HOME_VIEW[store.settings.receiverMode || 'ism'];
+  if (homeView && homeView !== 'dashboard') showView(homeView);
 
   updateStatusUI();
 
@@ -221,9 +266,9 @@ async function main() {
     /* non-fatal */
   }
 
-  // keyboard shortcuts: Ctrl+1..6 switch views
+  // keyboard shortcuts: Ctrl+1..8 switch views
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
+    if (e.ctrlKey && e.key >= '1' && e.key <= '8') {
       showView(Object.keys(VIEW_TITLES)[Number(e.key) - 1]);
       e.preventDefault();
     }

@@ -59,6 +59,29 @@ without an antenna.
 **Device categories** — filter the dashboard to just weather stations, tire
 pressure sensors, security contacts, remotes, utility meters and more.
 
+**Pager decoding (POCSAG)** — tune your regional pager network (e.g. Dutch
+P2000 on 169.65 MHz) and watch alphanumeric and numeric pages stream in. The
+bundled `rtl_fm` demodulates; the app itself recovers the bit clock at
+512/1200/2400 baud and decodes POCSAG with BCH error correction — validated
+against the protocol's published codewords.
+
+![pagers](gui/docs/pagers.png)
+
+**Radiosonde tracking (RS41)** — follow weather balloons at 400–406 MHz on the
+map: live altitude, climb rate, wind drift, temperature and battery telemetry,
+decoded by the bundled reference decoder (`rs41mod` from
+[rs1729/RS](https://github.com/rs1729/RS)). Launches happen worldwide around
+00:00 and 12:00 UTC.
+
+![radiosonde](gui/docs/sonde.png)
+
+**Multiple dongles, multiple modes at once** — every mode has its own SDR
+device selection, and pipelines run concurrently. With two dongles you can
+watch ISM sensors *and* track aircraft at the same time; the top-bar dropdown
+picks which mode the Start/Stop button controls, and the status pill shows
+everything that's running. With one dongle, run any single mode — the app
+warns if two modes would fight over the same device.
+
 **Console** — the raw rtl_433 stderr stream with timestamps, for
 troubleshooting driver, gain or decoder issues.
 
@@ -66,9 +89,10 @@ See [gui/](gui/) for build instructions and development notes. The GUI runs
 `rtl_433 -F json` (or `rtl_adsb` in aircraft mode) as a managed child process;
 settings map 1:1 onto the tools' command-line options.
 
-**Roadmap ideas** — the receiver-mode architecture leaves room for more
-1-dongle modes: AIS ship tracking (162 MHz), POCSAG pager decoding, and
-radiosonde tracking are natural next steps. Contributions welcome.
+**Roadmap ideas** — the receiver-mode architecture leaves room for more modes:
+AIS ship tracking (162 MHz) on the existing map, more radiosonde types (DFM,
+M10/M20, iMet), and FLARM/OGN glider tracking are natural next steps.
+Contributions welcome.
 
 ---
 

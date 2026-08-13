@@ -7,6 +7,10 @@ const { Rtl433Process, buildArgs, resolveBinary } = require('./rtl433');
 const { DemoSource } = require('./demo');
 const { AdsbSource } = require('./adsb');
 const { DemoAdsbSource } = require('./demo-adsb');
+const { PagerSource } = require('./pager-source');
+const { DemoPagerSource } = require('./demo-pager');
+const { SondeSource } = require('./sonde-source');
+const { DemoSondeSource } = require('./demo-sonde');
 
 let win = null;
 let settings = null;
@@ -14,38 +18,78 @@ const proc = new Rtl433Process();
 const demo = new DemoSource();
 const adsb = new AdsbSource();
 const demoAdsb = new DemoAdsbSource();
+const pager = new PagerSource();
+const demoPager = new DemoPagerSource();
+const sonde = new SondeSource();
+const demoSonde = new DemoSondeSource();
+
+// Each receiver mode has a real pipeline and a demo twin; with two (or more)
+// dongles several modes can run at once, each bound to its own SDR device.
+const MODES = {
+  ism: { real: proc, demo, isDemoRunning: () => demo.isRunning },
+  adsb: { real: adsb, demo: demoAdsb, isDemoRunning: () => demoAdsb.isRunning },
+  pocsag: { real: pager, demo: demoPager, isDemoRunning: () => demoPager.isRunning },
+  sonde: { real: sonde, demo: demoSonde, isDemoRunning: () => demoSonde.isRunning },
+};
+
 let demoMode = process.argv.includes('--demo');
-let lastStatus = { state: 'stopped' };
+const statusByMode = {}; // mode -> last status payload
 let manualStop = false; // user pressed Stop: suppress auto-restart
 let runStartedAt = 0;
 let restartTimer = null;
+
+function modeRunning(mode) {
+  const m = MODES[mode];
+  return m.real.running || m.isDemoRunning();
+}
 
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
-// Wire all sources to the same renderer streams.
-for (const src of [proc, demo, adsb, demoAdsb]) {
-  src.on('event', (e) => send('rt:event', e));
-  src.on('log', (l) => send('rt:log', l));
-  src.on('status', (s) => {
-    lastStatus = { ...s, demo: src === demo || src === demoAdsb ? true : s.demo };
-    send('rt:status', lastStatus);
-  });
+// Wire all sources to the same renderer streams; every status carries its mode.
+for (const [mode, m] of Object.entries(MODES)) {
+  for (const [src, isDemo] of [[m.real, false], [m.demo, true]]) {
+    src.on('event', (e) => send('rt:event', e));
+    src.on('log', (l) => send('rt:log', l));
+    src.on('status', (s) => {
+      const payload = { ...s, mode, demo: isDemo || s.demo };
+      statusByMode[mode] = payload;
+      send('rt:status', payload);
+    });
+  }
 }
 for (const src of [adsb, demoAdsb]) {
   src.on('aircraft', (snap) => send('rt:aircraft', snap));
 }
+for (const src of [pager, demoPager]) {
+  src.on('pager', (msg) => send('rt:pager', msg));
+}
+for (const src of [sonde, demoSonde]) {
+  src.on('sonde', (snap) => send('rt:sonde', snap));
+}
 
 function anyRunning() {
-  return proc.running || demo.isRunning || adsb.running || demoAdsb.isRunning;
+  return Object.keys(MODES).some(modeRunning);
+}
+
+function startMode(mode) {
+  const m = MODES[mode];
+  if (!m) return { ok: false, error: 'unknown mode' };
+  if (demoMode) return m.demo.start(settings.data);
+  return m.real.start(settings.data);
+}
+
+function stopMode(mode) {
+  const m = MODES[mode];
+  if (!m) return { ok: false, error: 'unknown mode' };
+  m.demo.stop();
+  return m.real.stop();
 }
 
 function stopAll() {
-  demo.stop();
-  demoAdsb.stop();
-  adsb.stop();
-  return proc.stop();
+  for (const mode of Object.keys(MODES)) stopMode(mode);
+  return { ok: true };
 }
 
 // Auto-restart: if rtl_433 dies unexpectedly after having run for a while
@@ -99,11 +143,8 @@ function createWindow() {
     win.webContents.once('did-finish-load', () => {
       if (settings && settings.data.autoStart) {
         setTimeout(() => {
-          if (anyRunning()) return;
           const mode = settings.data.receiverMode || 'ism';
-          if (mode === 'adsb') (demoMode ? demoAdsb : adsb).start(settings.data);
-          else if (demoMode) demo.start();
-          else proc.start(settings.data);
+          if (!modeRunning(mode)) startMode(mode);
         }, 800);
       }
     });
@@ -143,16 +184,24 @@ async function captureScreenshots(outDir) {
         const img = await win.webContents.capturePage();
         fs.writeFileSync(path.join(outDir, `${view}.png`), img.toPNG());
       }
-      // aircraft view with simulated ADS-B traffic
+      // remaining modes run concurrently (the multi-dongle scenario)
       demo.stop();
       await sleep(500);
       demoAdsb.start();
+      demoPager.start();
+      demoSonde.start();
       await win.webContents.executeJavaScript(
         `document.querySelector('.nav-item[data-view="aircraft"]').click()`
       );
       await sleep(Number(process.env.RTL433_SCREENSHOT_AIR_WAIT || 12000));
-      const img = await win.webContents.capturePage();
-      fs.writeFileSync(path.join(outDir, 'aircraft.png'), img.toPNG());
+      for (const view of ['aircraft', 'pagers', 'sonde']) {
+        await win.webContents.executeJavaScript(
+          `document.querySelector('.nav-item[data-view="${view}"]').click()`
+        );
+        await sleep(900);
+        const img = await win.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, `${view}.png`), img.toPNG());
+      }
       console.log('screenshots written to', outDir);
     } catch (e) {
       console.error('screenshot capture failed:', e);
@@ -172,26 +221,30 @@ app.on('before-quit', () => {
 });
 
 // ---- IPC ----
-ipcMain.handle('rt:start', () => {
-  manualStop = false;
-  const mode = settings.data.receiverMode || 'ism';
-  if (mode === 'adsb') {
-    if (demoMode) return demoAdsb.start();
-    return adsb.start(settings.data);
-  }
-  if (demoMode) return demo.start();
-  return proc.start(settings.data);
+ipcMain.handle('rt:start', (_e, mode) => {
+  mode = mode || settings.data.receiverMode || 'ism';
+  if (mode === 'ism') manualStop = false;
+  if (modeRunning(mode)) return { ok: false, error: 'this mode is already running' };
+  return startMode(mode);
 });
 
-ipcMain.handle('rt:stop', () => {
-  manualStop = true;
-  clearTimeout(restartTimer);
-  return stopAll();
+ipcMain.handle('rt:stop', (_e, mode) => {
+  if (!mode) {
+    manualStop = true;
+    clearTimeout(restartTimer);
+    return stopAll();
+  }
+  if (mode === 'ism') {
+    manualStop = true;
+    clearTimeout(restartTimer);
+  }
+  return stopMode(mode);
 });
 
 ipcMain.handle('rt:setMode', (_e, mode) => {
-  if (anyRunning()) return { ok: false, error: 'stop the receiver before switching mode' };
-  if (mode !== 'ism' && mode !== 'adsb') return { ok: false, error: 'unknown mode' };
+  // "selected" mode only affects which pipeline the top-bar button controls;
+  // switching is always allowed — other modes keep running
+  if (!MODES[mode]) return { ok: false, error: 'unknown mode' };
   settings.save({ receiverMode: mode });
   return { ok: true, mode };
 });
@@ -210,7 +263,13 @@ ipcMain.handle('rt:copyText', (_e, text) => {
 
 ipcMain.handle('rt:version', () => app.getVersion());
 
-ipcMain.handle('rt:getStatus', () => ({ ...lastStatus, demoMode, running: anyRunning() }));
+ipcMain.handle('rt:getStatus', () => ({
+  demoMode,
+  running: anyRunning(),
+  modes: Object.fromEntries(
+    Object.keys(MODES).map((m) => [m, { ...(statusByMode[m] || { state: 'stopped', mode: m }), running: modeRunning(m) }])
+  ),
+}));
 
 ipcMain.handle('rt:setDemoMode', (_e, on) => {
   if (anyRunning()) return { ok: false, error: 'stop the receiver first' };

@@ -14,6 +14,11 @@ class Store {
     this.logs = [];
     this.maxLogs = 3000;
     this.status = { state: 'stopped' };
+    this.modeStatus = {}; // mode -> latest status payload
+    this.pagerMessages = []; // newest first
+    this.maxPagerMessages = 2000;
+    this.totalPagerMessages = 0;
+    this.sonde = { sonde: null, trail: [], frames: 0 };
     this.demoMode = false;
     this.settings = null;
     this.startedAt = null;
@@ -150,11 +155,34 @@ class Store {
   }
 
   setStatus(s) {
-    const wasRunning = this.status.state === 'running';
+    const mode = s.mode || 'ism';
+    this.modeStatus[mode] = s;
     this.status = s;
-    if (s.state === 'running' && !wasRunning) this.startedAt = Date.now();
-    if (s.state !== 'running') this.startedAt = null;
+    if (mode === 'ism') {
+      // session timer tracks the ISM pipeline (dashboard stat tile)
+      const wasRunning = !!this.startedAt;
+      if (s.state === 'running' && !wasRunning) this.startedAt = Date.now();
+      if (s.state !== 'running') this.startedAt = null;
+    }
     this._notify('status');
+  }
+
+  runningModes() {
+    return Object.entries(this.modeStatus)
+      .filter(([, s]) => s.state === 'running')
+      .map(([m]) => m);
+  }
+
+  addPagerMessage(msg) {
+    this.pagerMessages.unshift(msg);
+    this.totalPagerMessages++;
+    if (this.pagerMessages.length > this.maxPagerMessages) this.pagerMessages.length = this.maxPagerMessages;
+    this._notify('pagers');
+  }
+
+  setSonde(snap) {
+    this.sonde = snap;
+    this._notify('sonde');
   }
 
   eventsPerMinute() {

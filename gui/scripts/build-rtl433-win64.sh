@@ -42,8 +42,11 @@ if [ ! -d rtl-sdr-${rtlsdr_ver} ]; then
     git clone --depth 1 --branch v${rtlsdr_ver} https://github.com/osmocom/rtl-sdr rtl-sdr-${rtlsdr_ver}
 fi
 # rtl-sdr's CMake always links its tools against the SHARED librtlsdr; we ship
-# rtl_adsb.exe and want it self-contained, so point it at the static target
-sed -i 's/target_link_libraries(rtl_adsb rtlsdr convenience_static/target_link_libraries(rtl_adsb rtlsdr_static convenience_static/' \
+# rtl_adsb.exe and rtl_fm.exe and want them self-contained, so point them at
+# the static target
+sed -i \
+    -e 's/target_link_libraries(rtl_adsb rtlsdr convenience_static/target_link_libraries(rtl_adsb rtlsdr_static convenience_static/' \
+    -e 's/target_link_libraries(rtl_fm rtlsdr convenience_static/target_link_libraries(rtl_fm rtlsdr_static convenience_static/' \
     rtl-sdr-${rtlsdr_ver}/src/CMakeLists.txt
 if [ ! -e "$sysroot/usr/lib/librtlsdr.a" ]; then
     export CMAKE_SYSROOT=$sysroot
@@ -71,9 +74,20 @@ cmake --build build-rtl433
 cmake --install build-rtl433
 rm -rf build-rtl433
 
+# rs41mod: the reference RS41 radiosonde decoder from rs1729/RS (GPL-3),
+# reads FM-demodulated s16 audio on stdin and emits JSON telemetry per frame
+if [ ! -d RS ]; then
+    git clone --depth 1 https://github.com/rs1729/RS
+fi
+x86_64-w64-mingw32-gcc -O2 -static -o rs41mod.exe \
+    RS/demod/mod/rs41mod.c RS/demod/mod/demod_mod.c RS/demod/mod/bch_ecc_mod.c -lm -w
+
 out="$gui_dir/vendor/rtl_433"
 mkdir -p "$out"
 cp "$sysroot/usr/bin/rtl_433.exe" "$out/rtl_433.exe"
-# rtl_adsb (built as part of rtl-sdr) feeds the aircraft map with raw Mode S frames
+# rtl_adsb feeds the aircraft map with raw Mode S frames; rtl_fm feeds the
+# pager and radiosonde pipelines with FM-demodulated audio
 cp "$sysroot/usr/bin/rtl_adsb.exe" "$out/rtl_adsb.exe"
-echo "Bundled binaries ready: $out/rtl_433.exe, $out/rtl_adsb.exe"
+cp "$sysroot/usr/bin/rtl_fm.exe" "$out/rtl_fm.exe"
+cp rs41mod.exe "$out/rs41mod.exe"
+echo "Bundled binaries ready in $out: rtl_433, rtl_adsb, rtl_fm, rs41mod"

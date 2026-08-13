@@ -34,8 +34,8 @@ export async function initSettings() {
         </div>
       </div>
       <div class="form-row">
-        <div><div class="form-label">SDR device</div>
-          <div class="form-hint">RTL-SDR index (0,1,…), :serial, or a SoapySDR query. Empty = first device.</div></div>
+        <div><div class="form-label">SDR device (ISM)</div>
+          <div class="form-hint">RTL-SDR index (0,1,…), :serial, or a SoapySDR query. Empty = first device. With two dongles, give each mode its own index so they can run at the same time.</div></div>
         <div class="form-field"><input type="text" id="s-device" class="wide" placeholder="0" /></div>
       </div>
     </div>
@@ -77,7 +77,17 @@ export async function initSettings() {
 
     <div class="settings-card">
       <h3>ADS-B aircraft</h3>
-      <div class="card-sub">Used when the receiver mode is set to ADS-B (1090 MHz) in the top bar.</div>
+      <div class="card-sub">The 1090 MHz aircraft pipeline (bundled rtl_adsb).</div>
+      <div class="form-row">
+        <div><div class="form-label">SDR device</div>
+          <div class="form-hint">Dongle index for ADS-B — use a different one than ISM to run both at once.</div></div>
+        <div class="form-field"><input type="text" id="s-adsb-dev" style="width:110px" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Gain</div>
+          <div class="form-hint">Empty = rtl_adsb default (max). ADS-B usually benefits from high gain.</div></div>
+        <div class="form-field"><input type="text" id="s-adsb-gain" style="width:110px" placeholder="max" /> <span class="form-hint">dB</span></div>
+      </div>
       <div class="form-row">
         <div><div class="form-label">rtl_adsb executable</div>
           <div class="form-hint">Leave empty to use the copy bundled with the app.</div></div>
@@ -86,10 +96,49 @@ export async function initSettings() {
           <button class="btn btn-sm" id="s-adsb-browse">Browse…</button>
         </div>
       </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Pagers (POCSAG)</h3>
+      <div class="card-sub">FM demodulated by the bundled rtl_fm; POCSAG 512/1200/2400 decoded in-app.</div>
       <div class="form-row">
-        <div><div class="form-label">Gain</div>
-          <div class="form-hint">Empty = rtl_adsb default (max). ADS-B usually benefits from high gain.</div></div>
-        <div class="form-field"><input type="text" id="s-adsb-gain" style="width:110px" placeholder="max" /> <span class="form-hint">dB</span></div>
+        <div><div class="form-label">SDR device</div>
+          <div class="form-hint">Dongle index for the pager receiver.</div></div>
+        <div class="form-field"><input type="text" id="s-pg-dev" style="width:110px" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Frequency</div>
+          <div class="form-hint">Pager networks are regional — pick the one for your country.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-pg-freq" style="width:130px" placeholder="169.65M" />
+          <div class="preset-chips" id="s-pg-presets"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Gain</div><div class="form-hint">Empty = automatic.</div></div>
+        <div class="form-field"><input type="text" id="s-pg-gain" style="width:110px" placeholder="auto" /> <span class="form-hint">dB</span></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Radiosonde (RS41)</h3>
+      <div class="card-sub">Weather balloons at 400–406 MHz, decoded by the bundled rs41mod (rs1729/RS).</div>
+      <div class="form-row">
+        <div><div class="form-label">SDR device</div>
+          <div class="form-hint">Dongle index for the sonde receiver.</div></div>
+        <div class="form-field"><input type="text" id="s-sd-dev" style="width:110px" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Frequency</div>
+          <div class="form-hint">Your local sonde frequency; check a tracker site like sondehub.org.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-sd-freq" style="width:130px" placeholder="402.7M" />
+          <div class="preset-chips" id="s-sd-presets"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Gain</div><div class="form-hint">Empty = automatic.</div></div>
+        <div class="form-field"><input type="text" id="s-sd-gain" style="width:110px" placeholder="auto" /> <span class="form-hint">dB</span></div>
       </div>
     </div>
 
@@ -193,6 +242,40 @@ export async function initSettings() {
   g('s-extra').value = draft.extraArgs || '';
   g('s-adsb-bin').value = draft.adsbPath || '';
   g('s-adsb-gain').value = draft.adsbGain ?? '';
+  g('s-adsb-dev').value = draft.adsbDevice || '';
+  g('s-pg-dev').value = draft.pagerDevice || '';
+  g('s-pg-freq').value = draft.pagerFreq || '169.65M';
+  g('s-pg-gain').value = draft.pagerGain ?? '';
+  g('s-sd-dev').value = draft.sondeDevice || '';
+  g('s-sd-freq').value = draft.sondeFreq || '402.7M';
+  g('s-sd-gain').value = draft.sondeGain ?? '';
+
+  // regional presets for the pager and sonde bands
+  const chipRow = (hostId, inputId, presets) => {
+    const host = g(hostId);
+    for (const p of presets) {
+      const b = document.createElement('button');
+      b.className = 'preset-chip';
+      b.textContent = p.label;
+      b.title = p.title || '';
+      b.addEventListener('click', () => {
+        g(inputId).value = p.value;
+      });
+      host.appendChild(b);
+    }
+  };
+  chipRow('s-pg-presets', 's-pg-freq', [
+    { label: '169.65 (NL P2000)', value: '169.65M' },
+    { label: '152.840 (US)', value: '152.840M' },
+    { label: '153.350 (SE)', value: '153.350M' },
+    { label: '466.075 (FR)', value: '466.075M' },
+  ]);
+  chipRow('s-sd-presets', 's-sd-freq', [
+    { label: '402.7', value: '402.7M' },
+    { label: '403.0', value: '403M' },
+    { label: '404.3', value: '404.3M' },
+    { label: '405.3', value: '405.3M' },
+  ]);
   g('s-autostart').checked = !!draft.autoStart;
   g('s-autorestart').checked = !!draft.autoRestart;
   g('s-notifynew').checked = !!draft.notifyNewDevice;
@@ -269,6 +352,13 @@ export async function initSettings() {
       extraArgs: g('s-extra').value,
       adsbPath: g('s-adsb-bin').value.trim(),
       adsbGain: g('s-adsb-gain').value.trim(),
+      adsbDevice: g('s-adsb-dev').value.trim(),
+      pagerDevice: g('s-pg-dev').value.trim(),
+      pagerFreq: g('s-pg-freq').value.trim() || '169.65M',
+      pagerGain: g('s-pg-gain').value.trim(),
+      sondeDevice: g('s-sd-dev').value.trim(),
+      sondeFreq: g('s-sd-freq').value.trim() || '402.7M',
+      sondeGain: g('s-sd-gain').value.trim(),
       autoStart: g('s-autostart').checked,
       autoRestart: g('s-autorestart').checked,
       notifyNewDevice: g('s-notifynew').checked,

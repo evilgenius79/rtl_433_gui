@@ -2,9 +2,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('rtl433', {
-  // control
-  start: () => ipcRenderer.invoke('rt:start'),
-  stop: () => ipcRenderer.invoke('rt:stop'),
+  // control (mode: ism | adsb | pocsag | sonde; omitted = selected mode)
+  start: (mode) => ipcRenderer.invoke('rt:start', mode),
+  stop: (mode) => ipcRenderer.invoke('rt:stop', mode),
   getStatus: () => ipcRenderer.invoke('rt:getStatus'),
   setDemoMode: (on) => ipcRenderer.invoke('rt:setDemoMode', on),
   setMode: (mode) => ipcRenderer.invoke('rt:setMode', mode),
@@ -26,4 +26,6 @@ contextBridge.exposeInMainWorld('rtl433', {
   onLog: (cb) => ipcRenderer.on('rt:log', (_e, data) => cb(data)),
   onStatus: (cb) => ipcRenderer.on('rt:status', (_e, data) => cb(data)),
   onAircraft: (cb) => ipcRenderer.on('rt:aircraft', (_e, data) => cb(data)),
+  onPager: (cb) => ipcRenderer.on('rt:pager', (_e, data) => cb(data)),
+  onSonde: (cb) => ipcRenderer.on('rt:sonde', (_e, data) => cb(data)),
 });

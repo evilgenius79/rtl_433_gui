@@ -61,12 +61,24 @@ installer on every push that touches `gui/`, uploading it as a build artifact �
 and pushing a tag like **`gui-v0.1.0`** publishes it automatically as a GitHub
 Release with the `.exe` attached.
 
-### Bundled rtl_433.exe
+### Bundled binaries
 
-Installer and zip builds **ship with a statically linked `rtl_433.exe`**
-cross-compiled from this repository's own sources
-(`gui/scripts/build-rtl433-win64.sh`, run automatically in CI) — no separate
-rtl_433 install is needed. The app looks for `rtl_433.exe` in this order:
+Installer and zip builds ship with statically linked, self-contained tools,
+cross-compiled by `gui/scripts/build-rtl433-win64.sh` (run automatically in
+CI) — no separate installs needed:
+
+| Binary | Source | Used for |
+|---|---|---|
+| `rtl_433.exe` | this repository (GPL-2) | ISM sensor decoding |
+| `rtl_adsb.exe` | osmocom rtl-sdr tools (GPL-2) | raw Mode S frames for the aircraft map |
+| `rtl_fm.exe` | osmocom rtl-sdr tools (GPL-2) | FM demodulation for pagers & radiosondes |
+| `rs41mod.exe` | [rs1729/RS](https://github.com/rs1729/RS) (GPL-3) | RS41 radiosonde telemetry |
+
+POCSAG and Mode S/ADS-B decoding is implemented in the app itself
+(`main/pocsag.js`, `main/modes.js`) with unit tests against published
+reference vectors.
+
+The app looks for `rtl_433.exe` in this order:
 
 1. the path configured in **Settings → Receiver**,
 2. the bundled copy (`resources/rtl_433/rtl_433.exe`, or `gui/vendor/rtl_433/`

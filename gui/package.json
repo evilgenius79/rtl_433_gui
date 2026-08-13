@@ -1,8 +1,8 @@
 {
   "name": "rtl433-gui",
   "productName": "rtl_433 GUI",
-  "version": "0.2.0",
-  "description": "Desktop GUI for rtl_433 - live dashboard, event log and charts for 433/868/915 MHz sensor traffic",
+  "version": "0.3.0",
+  "description": "Desktop GUI for rtl_433 - live dashboard, event log and charts for ISM sensors, ADS-B aircraft, POCSAG pagers and radiosondes",
   "main": "main/main.js",
   "license": "GPL-2.0-or-later",
   "author": "rtl_433 GUI contributors",
