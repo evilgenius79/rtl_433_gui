@@ -18,8 +18,19 @@ mkdir -p "$work" "$sysroot/usr/include" "$sysroot/usr/lib" "$sysroot/usr/bin"
 cd "$work"
 
 # libusb (prebuilt static MinGW lib from the official release)
+# --fail keeps HTTP error pages out of the output file; verify the archive and
+# retry once from scratch so a truncated download can't get cached (this bit CI once)
 if [ ! -e libusb/include/libusb.h ]; then
-    [ -e libusb-${libusb_ver}.7z ] || curl -L -O https://github.com/libusb/libusb/releases/download/v${libusb_ver}/libusb-${libusb_ver}.7z
+    for attempt in 1 2; do
+        [ -e libusb-${libusb_ver}.7z ] || curl -fL --retry 3 --retry-delay 2 -O \
+            https://github.com/libusb/libusb/releases/download/v${libusb_ver}/libusb-${libusb_ver}.7z
+        if 7z t libusb-${libusb_ver}.7z > /dev/null 2>&1; then
+            break
+        fi
+        echo "libusb archive corrupt (attempt $attempt), re-downloading" >&2
+        rm -f libusb-${libusb_ver}.7z
+        [ "$attempt" = 2 ] && exit 1
+    done
     mkdir -p libusb
     7z x -olibusb -y libusb-${libusb_ver}.7z > /dev/null
 fi
