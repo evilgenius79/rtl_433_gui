@@ -156,6 +156,31 @@ export function signalLevel(rssi) {
   return 1;
 }
 
+// Rough device categories inferred from the fields a device reports.
+// Order matters: the first matching rule wins.
+export const CATEGORIES = {
+  weather: 'Weather stations',
+  thermo: 'Temp / humidity',
+  garden: 'Soil & garden',
+  tpms: 'Tire pressure',
+  security: 'Security & alarm',
+  remote: 'Remotes & switches',
+  meter: 'Utility & power',
+  other: 'Other',
+};
+
+export function categorize(evt) {
+  const has = (k) => evt[k] !== undefined;
+  if (evt.type === 'TPMS' || (has('pressure_kPa') && !has('humidity')) || has('pressure_PSI')) return 'tpms';
+  if (has('wind_avg_km_h') || has('wind_avg_m_s') || has('rain_mm') || has('rain_in') || has('wind_dir_deg')) return 'weather';
+  if (has('moisture')) return 'garden';
+  if (has('contact_open') || has('reed_open') || has('alarm') || has('tamper') || has('motion') || /security|alarm/i.test(evt.model || '')) return 'security';
+  if (has('power_W') || has('energy_kWh') || has('current_A') || has('consumption')) return 'meter';
+  if (has('temperature_C') || has('temperature_F') || has('humidity')) return 'thermo';
+  if (has('button') || has('cmd') || has('tristate') || has('code') || has('group')) return 'remote';
+  return 'other';
+}
+
 // HTML-escape any value derived from decoded RF data before it goes into
 // innerHTML — model/id/state strings are external input.
 export function esc(v) {

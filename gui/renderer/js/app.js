@@ -4,6 +4,7 @@ import { deviceKey, summarize } from './format.js';
 import { initDashboard, refreshDashboard } from './views/dashboard.js';
 import { initEvents, refreshEvents } from './views/events.js';
 import { initCharts, rerenderCharts } from './views/charts.js';
+import { initAircraft, refreshAircraft } from './views/aircraft.js';
 import { initConsole } from './views/console.js';
 import { initSettings } from './views/settings.js';
 
@@ -11,6 +12,7 @@ const VIEW_TITLES = {
   dashboard: 'Dashboard',
   events: 'Events',
   charts: 'Charts',
+  aircraft: 'Aircraft',
   console: 'Console',
   settings: 'Settings',
 };
@@ -32,6 +34,7 @@ function showView(name) {
   if (name === 'charts') rerenderCharts();
   if (name === 'dashboard') refreshDashboard();
   if (name === 'events') refreshEvents();
+  if (name === 'aircraft') refreshAircraft();
 }
 
 // ---- toasts ----
@@ -59,17 +62,29 @@ function updateStatusUI() {
 
   const s = store.status;
   const running = s.state === 'running';
+  const modeTag = s.mode === 'adsb' ? ' ADS-B' : '';
   pill.className = `status-pill ${s.state === 'error' ? 'error' : running ? 'running' : 'stopped'}`;
-  text.textContent = running ? (s.demo ? 'Receiving · demo' : 'Receiving') : s.state === 'error' ? 'Error' : 'Stopped';
+  text.textContent = running
+    ? `Receiving${modeTag}${s.demo ? ' · demo' : ''}`
+    : s.state === 'error' ? 'Error' : 'Stopped';
   btnText.textContent = running ? 'Stop' : 'Start';
   btn.classList.toggle('btn-primary', !running);
   btn.classList.toggle('btn-danger', running);
   // note: SVG elements ignore the `hidden` attribute — toggle display instead
   iconPlay.style.display = running ? 'none' : '';
   iconStop.style.display = running ? '' : 'none';
+  // the receiver mode can't change while running
+  document.getElementById('mode-select').disabled = running;
 }
 
 window.updateFreqChip = () => {
+  const adsbActive =
+    (store.status.state === 'running' && store.status.mode === 'adsb') ||
+    (store.settings?.receiverMode || 'ism') === 'adsb';
+  if (adsbActive) {
+    document.getElementById('freq-chip-text').textContent = '1090 MHz';
+    return;
+  }
   const freqs = store.settings?.frequencies?.filter((f) => String(f).trim()) || [];
   const fmt = (f) => {
     const s = String(f).trim();
@@ -115,6 +130,24 @@ async function main() {
 
   document.getElementById('btn-startstop').addEventListener('click', toggleStartStop);
 
+  // receiver mode select
+  const modeSelect = document.getElementById('mode-select');
+  modeSelect.value = store.settings.receiverMode || 'ism';
+  modeSelect.addEventListener('change', async () => {
+    const res = await window.rtl433.setMode(modeSelect.value);
+    if (res.ok === false) {
+      modeSelect.value = store.settings.receiverMode || 'ism';
+      window.toast(res.error || 'Cannot switch mode now', 'error');
+      return;
+    }
+    store.settings.receiverMode = res.mode;
+    window.updateFreqChip();
+    showView(res.mode === 'adsb' ? 'aircraft' : 'dashboard');
+    window.toast(res.mode === 'adsb'
+      ? 'ADS-B mode — Start will tune 1090 MHz and track aircraft.'
+      : 'ISM mode — Start will run rtl_433 for sensor traffic.');
+  });
+
   // demo toggle
   const demoToggle = document.getElementById('demo-toggle');
   const status = await window.rtl433.getStatus();
@@ -158,6 +191,7 @@ async function main() {
   window.rtl433.onStatus((s) => {
     store.setStatus(s);
     updateStatusUI();
+    window.updateFreqChip();
     if (s.state === 'error' && s.error) window.toast(s.error, 'error');
   });
   store.on('status', updateStatusUI);
@@ -166,8 +200,12 @@ async function main() {
   initDashboard();
   initEvents();
   initCharts();
+  initAircraft();
   initConsole();
   initSettings();
+
+  // land on the view matching the saved receiver mode
+  if ((store.settings.receiverMode || 'ism') === 'adsb') showView('aircraft');
 
   updateStatusUI();
 
@@ -183,9 +221,9 @@ async function main() {
     /* non-fatal */
   }
 
-  // keyboard shortcuts: Ctrl+1..5 switch views, Space toggles when not typing
+  // keyboard shortcuts: Ctrl+1..6 switch views
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+    if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
       showView(Object.keys(VIEW_TITLES)[Number(e.key) - 1]);
       e.preventDefault();
     }

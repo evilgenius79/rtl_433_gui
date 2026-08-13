@@ -5,11 +5,15 @@ const fs = require('fs');
 const { Settings } = require('./settings');
 const { Rtl433Process, buildArgs, resolveBinary } = require('./rtl433');
 const { DemoSource } = require('./demo');
+const { AdsbSource } = require('./adsb');
+const { DemoAdsbSource } = require('./demo-adsb');
 
 let win = null;
 let settings = null;
 const proc = new Rtl433Process();
 const demo = new DemoSource();
+const adsb = new AdsbSource();
+const demoAdsb = new DemoAdsbSource();
 let demoMode = process.argv.includes('--demo');
 let lastStatus = { state: 'stopped' };
 let manualStop = false; // user pressed Stop: suppress auto-restart
@@ -20,14 +24,28 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
-// Wire both sources to the same renderer streams.
-for (const src of [proc, demo]) {
+// Wire all sources to the same renderer streams.
+for (const src of [proc, demo, adsb, demoAdsb]) {
   src.on('event', (e) => send('rt:event', e));
   src.on('log', (l) => send('rt:log', l));
   src.on('status', (s) => {
-    lastStatus = { ...s, demo: src === demo ? true : s.demo };
+    lastStatus = { ...s, demo: src === demo || src === demoAdsb ? true : s.demo };
     send('rt:status', lastStatus);
   });
+}
+for (const src of [adsb, demoAdsb]) {
+  src.on('aircraft', (snap) => send('rt:aircraft', snap));
+}
+
+function anyRunning() {
+  return proc.running || demo.isRunning || adsb.running || demoAdsb.isRunning;
+}
+
+function stopAll() {
+  demo.stop();
+  demoAdsb.stop();
+  adsb.stop();
+  return proc.stop();
 }
 
 // Auto-restart: if rtl_433 dies unexpectedly after having run for a while
@@ -81,10 +99,11 @@ function createWindow() {
     win.webContents.once('did-finish-load', () => {
       if (settings && settings.data.autoStart) {
         setTimeout(() => {
-          if (!proc.running && !demo.isRunning) {
-            if (demoMode) demo.start();
-            else proc.start(settings.data);
-          }
+          if (anyRunning()) return;
+          const mode = settings.data.receiverMode || 'ism';
+          if (mode === 'adsb') (demoMode ? demoAdsb : adsb).start(settings.data);
+          else if (demoMode) demo.start();
+          else proc.start(settings.data);
         }, 800);
       }
     });
@@ -124,6 +143,16 @@ async function captureScreenshots(outDir) {
         const img = await win.webContents.capturePage();
         fs.writeFileSync(path.join(outDir, `${view}.png`), img.toPNG());
       }
+      // aircraft view with simulated ADS-B traffic
+      demo.stop();
+      await sleep(500);
+      demoAdsb.start();
+      await win.webContents.executeJavaScript(
+        `document.querySelector('.nav-item[data-view="aircraft"]').click()`
+      );
+      await sleep(Number(process.env.RTL433_SCREENSHOT_AIR_WAIT || 12000));
+      const img = await win.webContents.capturePage();
+      fs.writeFileSync(path.join(outDir, 'aircraft.png'), img.toPNG());
       console.log('screenshots written to', outDir);
     } catch (e) {
       console.error('screenshot capture failed:', e);
@@ -134,19 +163,22 @@ async function captureScreenshots(outDir) {
 }
 
 app.on('window-all-closed', () => {
-  proc.stop();
-  demo.stop();
+  stopAll();
   app.quit();
 });
 
 app.on('before-quit', () => {
-  proc.stop();
-  demo.stop();
+  stopAll();
 });
 
 // ---- IPC ----
 ipcMain.handle('rt:start', () => {
   manualStop = false;
+  const mode = settings.data.receiverMode || 'ism';
+  if (mode === 'adsb') {
+    if (demoMode) return demoAdsb.start();
+    return adsb.start(settings.data);
+  }
   if (demoMode) return demo.start();
   return proc.start(settings.data);
 });
@@ -154,8 +186,14 @@ ipcMain.handle('rt:start', () => {
 ipcMain.handle('rt:stop', () => {
   manualStop = true;
   clearTimeout(restartTimer);
-  demo.stop();
-  return proc.stop();
+  return stopAll();
+});
+
+ipcMain.handle('rt:setMode', (_e, mode) => {
+  if (anyRunning()) return { ok: false, error: 'stop the receiver before switching mode' };
+  if (mode !== 'ism' && mode !== 'adsb') return { ok: false, error: 'unknown mode' };
+  settings.save({ receiverMode: mode });
+  return { ok: true, mode };
 });
 
 ipcMain.handle('rt:previewCmd', () => {
@@ -172,10 +210,10 @@ ipcMain.handle('rt:copyText', (_e, text) => {
 
 ipcMain.handle('rt:version', () => app.getVersion());
 
-ipcMain.handle('rt:getStatus', () => ({ ...lastStatus, demoMode, running: proc.running || demo.isRunning }));
+ipcMain.handle('rt:getStatus', () => ({ ...lastStatus, demoMode, running: anyRunning() }));
 
 ipcMain.handle('rt:setDemoMode', (_e, on) => {
-  if (proc.running || demo.isRunning) return { ok: false, error: 'stop the receiver first' };
+  if (anyRunning()) return { ok: false, error: 'stop the receiver first' };
   demoMode = !!on;
   return { ok: true, demoMode };
 });

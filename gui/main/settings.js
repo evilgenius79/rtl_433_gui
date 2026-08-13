@@ -25,6 +25,9 @@ const DEFAULTS = {
   autoRestart: false, // relaunch rtl_433 if it exits unexpectedly
   notifyNewDevice: false, // desktop notification when an unseen device appears
   notifyLowBattery: true, // desktop notification when a sensor reports low battery
+  receiverMode: 'ism', // ism (rtl_433) | adsb (rtl_adsb aircraft)
+  adsbPath: '', // rtl_adsb binary override; empty = bundled copy
+  adsbGain: '', // -g for rtl_adsb; empty = default
 };
 
 class Settings {

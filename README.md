@@ -46,12 +46,29 @@ in the Console view.
 
 ![settings](gui/docs/settings.png)
 
+**Aircraft map (ADS-B)** — switch the receiver to **ADS-B aircraft** in the top
+bar and the same dongle tunes 1090 MHz: a dark live map with rotated plane
+markers, flight trails, callsign/altitude/speed popups and a traffic list. The
+app bundles `rtl_adsb` (from the rtl-sdr tools) and decodes Mode S extended
+squitter itself — CRC-validated, with CPR position decoding tested against the
+published reference vectors. Demo mode simulates a fleet so you can try it
+without an antenna.
+
+![aircraft map](gui/docs/aircraft.png)
+
+**Device categories** — filter the dashboard to just weather stations, tire
+pressure sensors, security contacts, remotes, utility meters and more.
+
 **Console** — the raw rtl_433 stderr stream with timestamps, for
 troubleshooting driver, gain or decoder issues.
 
 See [gui/](gui/) for build instructions and development notes. The GUI runs
-`rtl_433 -F json` as a managed child process; settings map 1:1 onto rtl_433
-command-line options.
+`rtl_433 -F json` (or `rtl_adsb` in aircraft mode) as a managed child process;
+settings map 1:1 onto the tools' command-line options.
+
+**Roadmap ideas** — the receiver-mode architecture leaves room for more
+1-dongle modes: AIS ship tracking (162 MHz), POCSAG pager decoding, and
+radiosonde tracking are natural next steps. Contributions welcome.
 
 ---
 

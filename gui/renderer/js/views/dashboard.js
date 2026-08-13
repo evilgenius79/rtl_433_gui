@@ -2,7 +2,7 @@
 import { store } from '../state.js';
 import {
   pickPrimary, labelOf, unitOf, fmtValue, fmtValueUnit, metricKeysOf,
-  fmtAgo, fmtUptime, signalLevel, deviceTitle, esc,
+  fmtAgo, fmtUptime, signalLevel, deviceTitle, esc, categorize, CATEGORIES,
 } from '../format.js';
 import { renderSparkline } from '../chart.js';
 import { focusDevice } from './charts.js';
@@ -10,6 +10,7 @@ import { focusDevice } from './charts.js';
 const root = document.getElementById('view-dashboard');
 const cardEls = new Map(); // device key -> element
 let lastFlash = new Map();
+let categoryFilter = '';
 
 function statTile(id, label, icon) {
   return `<div class="stat-tile">
@@ -38,6 +39,9 @@ export function initDashboard() {
       <h2 class="section-title">Live devices</h2>
       <span class="section-sub" id="dash-devcount"></span>
       <span style="flex:1"></span>
+      <select id="dash-category" title="Show only one category of devices">
+        <option value="">All categories</option>
+      </select>
       <button class="btn btn-ghost btn-sm" id="dash-reset" title="Forget all devices and their chart history (also clears the saved copy)">Reset data</button>
     </div>
     <div class="device-grid" id="device-grid"></div>
@@ -50,6 +54,10 @@ export function initDashboard() {
   document.getElementById('dash-reset').addEventListener('click', () => {
     store.clearAll();
     window.toast('Device list and history cleared.');
+  });
+  document.getElementById('dash-category').addEventListener('change', (e) => {
+    categoryFilter = e.target.value;
+    renderDevices();
   });
 
   store.on('devices', renderDevices);
@@ -134,12 +142,29 @@ function renderDevices() {
   if (root.hidden) return; // refreshed on view switch instead
   const grid = document.getElementById('device-grid');
   const empty = document.getElementById('dash-empty');
-  const devs = [...store.devices.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+  const all = [...store.devices.values()].sort((a, b) => b.lastSeen - a.lastSeen);
 
-  empty.hidden = devs.length > 0;
+  // category dropdown with live counts (selection preserved)
+  const counts = {};
+  for (const d of all) {
+    const c = categorize(d.lastEvent);
+    counts[c] = (counts[c] || 0) + 1;
+  }
+  const catSel = document.getElementById('dash-category');
+  catSel.innerHTML = `<option value="">All categories (${all.length})</option>` +
+    Object.entries(CATEGORIES)
+      .filter(([id]) => counts[id])
+      .map(([id, label]) => `<option value="${id}">${label} (${counts[id]})</option>`)
+      .join('');
+  catSel.value = counts[categoryFilter] ? categoryFilter : '';
+  if (!counts[categoryFilter]) categoryFilter = catSel.value;
+
+  const devs = categoryFilter ? all.filter((d) => categorize(d.lastEvent) === categoryFilter) : all;
+
+  empty.hidden = all.length > 0;
   document.getElementById('dash-devcount').textContent = devs.length
     ? `${devs.length} device${devs.length > 1 ? 's' : ''}, sorted by last transmission`
-    : '';
+    : all.length ? 'no devices in this category' : '';
 
   const seen = new Set();
   for (const dev of devs) {

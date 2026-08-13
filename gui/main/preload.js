@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('rtl433', {
   stop: () => ipcRenderer.invoke('rt:stop'),
   getStatus: () => ipcRenderer.invoke('rt:getStatus'),
   setDemoMode: (on) => ipcRenderer.invoke('rt:setDemoMode', on),
+  setMode: (mode) => ipcRenderer.invoke('rt:setMode', mode),
 
   // settings
   getSettings: () => ipcRenderer.invoke('rt:getSettings'),
@@ -24,4 +25,5 @@ contextBridge.exposeInMainWorld('rtl433', {
   onEvent: (cb) => ipcRenderer.on('rt:event', (_e, data) => cb(data)),
   onLog: (cb) => ipcRenderer.on('rt:log', (_e, data) => cb(data)),
   onStatus: (cb) => ipcRenderer.on('rt:status', (_e, data) => cb(data)),
+  onAircraft: (cb) => ipcRenderer.on('rt:aircraft', (_e, data) => cb(data)),
 });

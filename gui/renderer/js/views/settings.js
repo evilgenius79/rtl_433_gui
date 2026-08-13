@@ -76,6 +76,24 @@ export async function initSettings() {
     </div>
 
     <div class="settings-card">
+      <h3>ADS-B aircraft</h3>
+      <div class="card-sub">Used when the receiver mode is set to ADS-B (1090 MHz) in the top bar.</div>
+      <div class="form-row">
+        <div><div class="form-label">rtl_adsb executable</div>
+          <div class="form-hint">Leave empty to use the copy bundled with the app.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-adsb-bin" class="wide" placeholder="(bundled)" />
+          <button class="btn btn-sm" id="s-adsb-browse">Browse…</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Gain</div>
+          <div class="form-hint">Empty = rtl_adsb default (max). ADS-B usually benefits from high gain.</div></div>
+        <div class="form-field"><input type="text" id="s-adsb-gain" style="width:110px" placeholder="max" /> <span class="form-hint">dB</span></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
       <h3>Decoders</h3>
       <div class="card-sub" id="s-proto-sub"></div>
       <div class="form-row">
@@ -173,6 +191,8 @@ export async function initSettings() {
   g('s-units').value = draft.units || 'si';
   g('s-level').checked = draft.reportLevel !== false;
   g('s-extra').value = draft.extraArgs || '';
+  g('s-adsb-bin').value = draft.adsbPath || '';
+  g('s-adsb-gain').value = draft.adsbGain ?? '';
   g('s-autostart').checked = !!draft.autoStart;
   g('s-autorestart').checked = !!draft.autoRestart;
   g('s-notifynew').checked = !!draft.notifyNewDevice;
@@ -200,6 +220,10 @@ export async function initSettings() {
   g('s-bin-browse').addEventListener('click', async () => {
     const res = await window.rtl433.pickBinary();
     if (res.ok) g('s-bin').value = res.path;
+  });
+  g('s-adsb-browse').addEventListener('click', async () => {
+    const res = await window.rtl433.pickBinary();
+    if (res.ok) g('s-adsb-bin').value = res.path;
   });
 
   g('s-proto-mode').addEventListener('change', () => {
@@ -243,6 +267,8 @@ export async function initSettings() {
       units: g('s-units').value,
       reportLevel: g('s-level').checked,
       extraArgs: g('s-extra').value,
+      adsbPath: g('s-adsb-bin').value.trim(),
+      adsbGain: g('s-adsb-gain').value.trim(),
       autoStart: g('s-autostart').checked,
       autoRestart: g('s-autorestart').checked,
       notifyNewDevice: g('s-notifynew').checked,

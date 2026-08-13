@@ -30,6 +30,10 @@ cp libusb/MinGW64/static/libusb-1.0.a "$sysroot/usr/lib"
 if [ ! -d rtl-sdr-${rtlsdr_ver} ]; then
     git clone --depth 1 --branch v${rtlsdr_ver} https://github.com/osmocom/rtl-sdr rtl-sdr-${rtlsdr_ver}
 fi
+# rtl-sdr's CMake always links its tools against the SHARED librtlsdr; we ship
+# rtl_adsb.exe and want it self-contained, so point it at the static target
+sed -i 's/target_link_libraries(rtl_adsb rtlsdr convenience_static/target_link_libraries(rtl_adsb rtlsdr_static convenience_static/' \
+    rtl-sdr-${rtlsdr_ver}/src/CMakeLists.txt
 if [ ! -e "$sysroot/usr/lib/librtlsdr.a" ]; then
     export CMAKE_SYSROOT=$sysroot
     cmake -S rtl-sdr-${rtlsdr_ver} -B build-rtlsdr \
@@ -37,7 +41,9 @@ if [ ! -e "$sysroot/usr/lib/librtlsdr.a" ]; then
         -DLIBUSB_FOUND=1 \
         -DLIBUSB_LIBRARIES="$sysroot/usr/lib/libusb-1.0.a" \
         -DLIBUSB_INCLUDE_DIRS="$sysroot/usr/include" \
-        -DBUILD_SHARED_LIBS:BOOL=OFF
+        -DBUILD_SHARED_LIBS:BOOL=OFF \
+        -DLINK_RTLTOOLS_AGAINST_STATIC_LIB=ON \
+        -DCMAKE_EXE_LINKER_FLAGS="-static"
     cmake --build build-rtlsdr
     cmake --install build-rtlsdr
     rm -rf build-rtlsdr
@@ -57,4 +63,6 @@ rm -rf build-rtl433
 out="$gui_dir/vendor/rtl_433"
 mkdir -p "$out"
 cp "$sysroot/usr/bin/rtl_433.exe" "$out/rtl_433.exe"
-echo "Bundled binary ready: $out/rtl_433.exe"
+# rtl_adsb (built as part of rtl-sdr) feeds the aircraft map with raw Mode S frames
+cp "$sysroot/usr/bin/rtl_adsb.exe" "$out/rtl_adsb.exe"
+echo "Bundled binaries ready: $out/rtl_433.exe, $out/rtl_adsb.exe"
