@@ -17,15 +17,22 @@ run concurrently across multiple dongles:
 
 ## Download
 
-Grab **`rtl_433 GUI Setup <version>.exe`** (or the portable `.zip`) from the
-[**Releases**](../../releases) page and run it. Everything is **bundled** —
-nine statically linked receiver tools (`rtl_433`, `rtl_adsb`, `rtl_fm`,
-`rtl_power` and five radiosonde decoders), nothing else to install — and the
-app **updates itself** from GitHub Releases from 0.4.0 on. Plug in your
-RTL-SDR dongle (install its WinUSB driver once with
-[Zadig](https://zadig.akeo.ie/) if needed) and press **Start** — or flip on
-**Demo mode** in the sidebar to explore every view with simulated traffic, no
-hardware needed.
+From the [**Releases**](../../releases) page:
+
+- **Windows** — `rtl_433 GUI Setup <version>.exe` (installer) or the portable `.zip`
+- **Linux** — `rtl_433 GUI-<version>.AppImage` (`chmod +x` and run, any distro)
+  or the `.deb` for Debian/Ubuntu
+
+Everything is **bundled** — nine receiver tools (`rtl_433`, `rtl_adsb`,
+`rtl_fm`, `rtl_power` and five radiosonde decoders), nothing else to install —
+and the app **updates itself** from GitHub Releases. Plug in your RTL-SDR
+dongle and press **Start** — or flip on **Demo mode** in the sidebar to
+explore every view with simulated traffic, no hardware needed.
+
+One-time dongle setup: on **Windows**, install the WinUSB driver with
+[Zadig](https://zadig.akeo.ie/); on **Linux**, install the rtl-sdr udev rules
+(`sudo apt install rtl-sdr`, or copy the rules file from osmocom) so the
+dongle is usable without root.
 
 ## What you get
 

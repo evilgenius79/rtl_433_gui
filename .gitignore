@@ -47,3 +47,5 @@ gui/node_modules/
 gui/dist/
 gui/vendor/
 gui/.win-build/
+gui/vendor-linux/
+gui/.linux-build/
