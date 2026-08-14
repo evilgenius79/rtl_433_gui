@@ -1,31 +1,49 @@
 # rtl_433 GUI
 
-A polished desktop GUI for [rtl_433](https://github.com/merbanan/rtl_433), built for
-Windows (runs on Linux/macOS too). It wraps the `rtl_433` command-line receiver and
-turns its JSON output into a live dashboard.
+A polished desktop GUI for [rtl_433](https://github.com/merbanan/rtl_433) and
+friends, built for Windows (runs on Linux/macOS too) — an RTL-SDR signal
+console with six receiver modes that run concurrently across multiple dongles.
 
 ![dashboard](docs/dashboard.png)
 
 ## Features
 
-- **Dashboard** — live cards for every device heard, with headline reading,
-  sparkline, signal bars, low-battery warnings and last-seen age. Click a card to
-  chart it.
+- **Dashboard (ISM sensors)** — live cards for every device heard, with
+  headline reading, sparkline, signal bars, low-battery warnings, category
+  filter and last-seen age. Click a card to chart it.
 - **Events** — filterable, pausable log of every decoded transmission with
-  expandable raw JSON, and CSV / NDJSON export.
-- **Charts** — time-series of any recorded metric (temperature, humidity, wind,
-  pressure…), overlaying up to three devices, with crosshair tooltips and
-  15 min / 1 h / 6 h / all ranges.
-- **Console** — the raw rtl_433 stderr stream for troubleshooting.
-- **Settings** — SDR device, frequency (with band presets and hopping), sample
-  rate, gain, PPM correction, per-protocol decoder toggles (all 378 protocols,
-  searchable), units, and free-form extra arguments.
-- **Demo mode** — replay realistic simulated sensor traffic with no SDR or
-  rtl_433 install needed. Great for a first look.
+  expandable raw JSON, CSV / NDJSON export, and optional daily NDJSON logging
+  to disk with retention.
+- **Charts** — time-series of any recorded metric, overlaying up to three
+  devices, with crosshair tooltips and 15 min / 1 h / 6 h / all ranges.
+  Device history persists across restarts.
+- **Aircraft (ADS-B, 1090 MHz)** — altitude-colored planes with trails on a
+  dark map, airline lookup, range rings, per-bearing coverage plot and
+  max-range stat; Mode S decoded in-app (CRC + CPR, reference-vector tested).
+- **Pagers (POCSAG)** — 512/1200/2400 baud decoded in-app with BCH error
+  correction; live message table with export.
+- **Radiosonde** — RS41 / DFM / M10 / M20 / iMet-54 balloons on the map with
+  altitude, climb, wind and PTU telemetry via the bundled rs1729/RS decoders.
+- **Ships (AIS)** — vessels with wakes on the map, decoded in-app (HDLC,
+  CRC-16/X.25, position + static reports).
+- **Spectrum** — rtl_power sweeps with live trace, max hold and waterfall;
+  band presets; click a peak and **listen** to it (FM/AM audio monitor).
+- **Alert rules** — thresholds, change detection and time windows per
+  device/metric, with desktop notifications and a dashboard alert strip.
+- **Integrations** — MQTT output for Home Assistant, straight from rtl_433.
+- **Console** — every pipeline's stderr stream for troubleshooting.
+- **Settings** — per-mode SDR device selection (multi-dongle), frequencies
+  with presets and hopping, gains, PPM, per-protocol decoder toggles (all 378
+  rtl_433 protocols), units, receiver location, tray behavior, auto-start /
+  auto-restart, notifications and free-form extra arguments.
+- **Demo mode** — every mode has a realistic simulator; explore the whole app
+  with no hardware.
+- **Auto-update** — packaged builds update themselves from GitHub Releases.
 
-The GUI runs `rtl_433 -F json` as a child process and parses its line-delimited
-JSON output; settings map 1:1 onto rtl_433 command-line options, and the exact
-command line used is always shown in the Console view.
+Each mode runs its receiver tool as a managed child process and the exact
+command line used is always shown in the Console view; POCSAG, Mode S/ADS-B
+and AIS are decoded in the app itself with unit tests against published
+reference vectors.
 
 ## Running from source
 
@@ -42,8 +60,8 @@ npm run start:demo # demo mode, no hardware needed
 
 Grab **`rtl_433 GUI Setup <version>.exe`** from the repository's
 [Releases](../../../releases) page (or the portable `.zip` if you prefer no
-installer), run it, and point **Settings → Receiver** at your `rtl_433.exe` if
-it isn't on the `PATH`.
+installer) and run it — all receiver tools are bundled, and the app keeps
+itself up to date from Releases.
 
 ## Building the Windows installer
 

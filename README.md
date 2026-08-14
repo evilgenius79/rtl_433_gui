@@ -1,21 +1,31 @@
 # rtl_433 GUI
 
-**This fork adds a polished desktop GUI for rtl_433** — a live sensor dashboard,
-event log, time-series charts and full receiver settings, packaged as a Windows
-installer. The GUI wraps the `rtl_433` command-line receiver and turns its JSON
-output into a live signal console.
+**This fork adds a polished desktop GUI for rtl_433** — a full RTL-SDR signal
+console packaged as a Windows installer, with **six receiver modes** that can
+run concurrently across multiple dongles:
+
+| Mode | Band | What you see |
+|---|---|---|
+| **ISM sensors** | 433 / 868 / 915 / 315 MHz | live device dashboard, event log, charts, MQTT |
+| **ADS-B aircraft** | 1090 MHz | dark map, altitude-colored planes, trails, coverage |
+| **POCSAG pagers** | regional VHF/UHF | live message table (alpha + numeric) |
+| **Radiosondes** | 400–406 MHz | balloon on the map with full telemetry (5 sonde types) |
+| **AIS ships** | 161.975 / 162.025 MHz | vessels with wakes on the map |
+| **Spectrum** | anywhere | sweep trace + waterfall, click-to-tune audio monitor |
 
 ![rtl_433 GUI dashboard](gui/docs/dashboard.png)
 
 ## Download
 
 Grab **`rtl_433 GUI Setup <version>.exe`** (or the portable `.zip`) from the
-[**Releases**](../../releases) page and run it. A statically linked
-`rtl_433.exe` built from this repository is **bundled with the app** — nothing
-else to install. Plug in your RTL-SDR dongle (install its WinUSB driver once
-with [Zadig](https://zadig.akeo.ie/) if needed) and press **Start** — or flip
-on **Demo mode** in the sidebar to explore the app with simulated sensor
-traffic, no hardware needed.
+[**Releases**](../../releases) page and run it. Everything is **bundled** —
+nine statically linked receiver tools (`rtl_433`, `rtl_adsb`, `rtl_fm`,
+`rtl_power` and five radiosonde decoders), nothing else to install — and the
+app **updates itself** from GitHub Releases from 0.4.0 on. Plug in your
+RTL-SDR dongle (install its WinUSB driver once with
+[Zadig](https://zadig.akeo.ie/) if needed) and press **Start** — or flip on
+**Demo mode** in the sidebar to explore every view with simulated traffic, no
+hardware needed.
 
 ## What you get
 
@@ -67,10 +77,11 @@ against the protocol's published codewords.
 
 ![pagers](gui/docs/pagers.png)
 
-**Radiosonde tracking (RS41)** — follow weather balloons at 400–406 MHz on the
-map: live altitude, climb rate, wind drift, temperature and battery telemetry,
-decoded by the bundled reference decoder (`rs41mod` from
-[rs1729/RS](https://github.com/rs1729/RS)). Launches happen worldwide around
+**Radiosonde tracking** — follow weather balloons at 400–406 MHz on the map:
+live altitude, climb rate, wind drift, temperature and battery telemetry, with
+ascent/descent phase detection. Five sonde types are supported (RS41, DFM-09/17,
+M10, M20, iMet-54) via the bundled reference decoders from
+[rs1729/RS](https://github.com/rs1729/RS). Launches happen worldwide around
 00:00 and 12:00 UTC.
 
 ![radiosonde](gui/docs/sonde.png)
@@ -112,17 +123,21 @@ rings and a coverage plot around your receiver location, five radiosonde types
 NDJSON event logging with retention, and automatic updates from GitHub
 Releases.
 
-**Console** — the raw rtl_433 stderr stream with timestamps, for
-troubleshooting driver, gain or decoder issues.
+**Console** — every pipeline's raw output with timestamps, for troubleshooting
+driver, gain or decoder issues; the exact command line for each receiver is
+always logged there.
 
-See [gui/](gui/) for build instructions and development notes. The GUI runs
-`rtl_433 -F json` (or `rtl_adsb` in aircraft mode) as a managed child process;
-settings map 1:1 onto the tools' command-line options.
+See [gui/](gui/) for build instructions, the bundled-binaries table and
+development notes. Each mode runs its receiver tool as a managed child process
+(`rtl_433 -F json`, `rtl_adsb`, `rtl_fm`, `rtl_power`, sonde decoders);
+settings map 1:1 onto the tools' command-line options, and POCSAG, Mode S and
+AIS are decoded in the app itself with unit tests against published reference
+vectors.
 
-**Roadmap ideas** — the receiver-mode architecture leaves room for more modes:
-AIS ship tracking (162 MHz) on the existing map, more radiosonde types (DFM,
-M10/M20, iMet), and FLARM/OGN glider tracking are natural next steps.
-Contributions welcome.
+**Roadmap ideas** — the receiver-mode architecture leaves room for more:
+ACARS aircraft messaging, FLARM/OGN glider tracking, more sonde types, and
+feeding community networks (SondeHub, ADS-B aggregators). Contributions
+welcome.
 
 ---
 
