@@ -10,8 +10,8 @@
     "start": "electron .",
     "start:demo": "electron . --demo",
     "test": "node --test \"test/*.test.js\"",
-    "dist": "electron-builder --win",
-    "dist:dir": "electron-builder --win --dir"
+    "dist": "electron-builder --win --publish never",
+    "dist:dir": "electron-builder --win --dir --publish never"
   },
   "build": {
     "appId": "org.rtl433.gui",
