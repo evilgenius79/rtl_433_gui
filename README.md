@@ -93,11 +93,13 @@ and wakes.
 
 ![ships](gui/docs/ships.png)
 
-**Spectrum analyzer** — sweep any range with the bundled `rtl_power`: a live
-trace with max-hold plus a scrolling waterfall, band presets (ISM 433/868,
-pagers, airband, marine), and click-to-read frequencies. An **audio monitor**
-tunes the same dongle with `rtl_fm` so you can *listen* to FM/AM signals you
-spot — click a peak to tune it.
+**Spectrum analyzer + tuner** — sweep any range with the bundled `rtl_power`:
+a live trace with max-hold plus a scrolling waterfall, band presets (ISM
+433/868, pagers, airband, marine), and click-to-read frequencies. Below it, a
+full **general-coverage tuner**: dial in any frequency the dongle supports
+(24 MHz–1.7 GHz), pick a demodulator — **WFM** for broadcast radio, **NBFM**,
+**AM** for airband, **USB/LSB** for SSB — with step buttons, squelch, savable
+bookmarks and live retuning. Click a peak on the trace to tune straight to it.
 
 ![spectrum](gui/docs/spectrum.png)
 

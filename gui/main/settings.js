@@ -67,6 +67,14 @@ const DEFAULTS = {
   // alert rules: {id, name, enabled, deviceKey|'', metric, op, value, from, to}
   alertRules: [],
   closeToTray: false,
+  // tuner bookmarks for the spectrum view's audio monitor
+  tunerBookmarks: [
+    { name: 'FM radio', freq: '96.3M', demod: 'wfm' },
+    { name: 'Airband', freq: '118.5M', demod: 'am' },
+    { name: 'Marine ch16', freq: '156.8M', demod: 'nbfm' },
+    { name: 'PMR446', freq: '446.00625M', demod: 'nbfm' },
+    { name: '2m ham', freq: '145.5M', demod: 'nbfm' },
+  ],
 };
 
 class Settings {

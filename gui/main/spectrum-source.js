@@ -10,6 +10,15 @@ const fs = require('fs');
 const path = require('path');
 const { resolveRtlFm } = require('./pager-source');
 
+// demodulator -> rtl_fm arguments and the resulting audio sample rate
+const DEMODS = {
+  wfm: { args: ['-M', 'wbfm', '-s', '170k', '-r', '32000'], rate: 32000 },
+  nbfm: { args: ['-M', 'fm', '-s', '24000'], rate: 24000 },
+  am: { args: ['-M', 'am', '-s', '24000'], rate: 24000 },
+  usb: { args: ['-M', 'usb', '-s', '24000'], rate: 24000 },
+  lsb: { args: ['-M', 'lsb', '-s', '24000'], rate: 24000 },
+};
+
 function resolveRtlPower(configured) {
   if (configured && configured.trim()) return configured.trim();
   const exe = process.platform === 'win32' ? 'rtl_power.exe' : 'rtl_power';
@@ -136,12 +145,16 @@ class SpectrumSource extends EventEmitter {
     });
   }
 
-  // ---- listen (rtl_fm audio to the renderer) ----
-  startListen(settings, { freq, demod }) {
-    // stop the sweep (same dongle) but keep the mode 'running'
+  // ---- listen (rtl_fm audio to the renderer): a general-coverage tuner ----
+  // Any frequency the dongle supports, five demodulators, optional squelch.
+  // Calling again while listening retunes (the old child is superseded).
+  startListen(settings, { freq, demod, squelch }) {
+    // stop the sweep or previous tune (same dongle) but keep the mode 'running'
     this._switchOff();
     const bin = resolveRtlFm(settings.rtlFmPath);
-    const args = ['-M', demod === 'am' ? 'am' : 'fm', '-f', String(freq), '-s', '24000'];
+    const d = DEMODS[demod] || DEMODS.nbfm;
+    const args = [...d.args, '-f', String(freq)];
+    if (squelch && Number(squelch) > 0) args.push('-l', String(Number(squelch)));
     if (settings.spectrumDevice) args.push('-d', String(settings.spectrumDevice));
     if (settings.spectrumGain !== '' && settings.spectrumGain != null) args.push('-g', String(settings.spectrumGain));
     if (settings.ppmError) args.push('-p', String(settings.ppmError));
@@ -151,13 +164,16 @@ class SpectrumSource extends EventEmitter {
     const res = this._spawnCommon(bin, args, 'rtl_fm (listen)', 'spectrum');
     if (res.error) return { ok: false, error: res.error };
     this.submode = 'listen';
-    this.emit('status', { state: 'running', pid: res.child.pid, mode: 'spectrum', submode: 'listen', freq });
+    this.emit('status', {
+      state: 'running', pid: res.child.pid, mode: 'spectrum',
+      submode: 'listen', freq, demod: demod || 'nbfm', sampleRate: d.rate,
+    });
 
     res.child.stdout.on('data', (buf) => {
-      // raw s16le mono 24 kHz chunks straight to the renderer
+      // raw s16le mono chunks straight to the renderer
       this.emit('audio', buf);
     });
-    return { ok: true, sampleRate: 24000 };
+    return { ok: true, sampleRate: d.rate };
   }
 
   stopListen(settings) {

@@ -26,8 +26,10 @@ console with six receiver modes that run concurrently across multiple dongles.
   altitude, climb, wind and PTU telemetry via the bundled rs1729/RS decoders.
 - **Ships (AIS)** — vessels with wakes on the map, decoded in-app (HDLC,
   CRC-16/X.25, position + static reports).
-- **Spectrum** — rtl_power sweeps with live trace, max hold and waterfall;
-  band presets; click a peak and **listen** to it (FM/AM audio monitor).
+- **Spectrum + tuner** — rtl_power sweeps with live trace, max hold and
+  waterfall; band presets; plus a general-coverage tuner (WFM / NBFM / AM /
+  USB / LSB) with step buttons, squelch and bookmarks — click a peak on the
+  trace to tune it.
 - **Alert rules** — thresholds, change detection and time windows per
   device/metric, with desktop notifications and a dashboard alert strip.
 - **Integrations** — MQTT output for Home Assistant, straight from rtl_433.

@@ -12,6 +12,26 @@ let listening = false;
 let audioCtx = null;
 let gainNode = null;
 let nextAudioTime = 0;
+let audioRate = 24000; // set from the active demodulator on listenStart
+let selectedDemod = 'nbfm';
+let meterDecay = 0;
+
+// '96.3M' / '156800k' / '96300000' -> Hz (null when unparsable)
+function parseFreqHz(s) {
+  const m = String(s).trim().match(/^([\d.]+)\s*([MkG]?)(?:Hz)?$/i);
+  if (!m) return null;
+  let v = parseFloat(m[1]);
+  const suf = m[2].toUpperCase();
+  if (suf === 'G') v *= 1e9;
+  else if (suf === 'M') v *= 1e6;
+  else if (suf === 'K') v *= 1e3;
+  else if (v < 3000) v *= 1e6; // a bare small number means MHz
+  return Math.round(v);
+}
+
+function fmtFreqM(hz) {
+  return `${+(hz / 1e6).toFixed(6)}M`;
+}
 
 const TRACE_H = 170;
 const WATER_H = 300;
@@ -42,19 +62,38 @@ export function initSpectrum() {
     </div>
     <div class="chart-card" style="padding:14px 16px">
       <div class="chart-head" style="margin-bottom:10px">
-        <span class="chart-title">Audio monitor</span>
-        <span class="section-sub">tunes the spectrum dongle with rtl_fm — sweeping pauses while listening</span>
+        <span class="chart-title">Tuner</span>
+        <span class="section-sub">any frequency the dongle covers, five demodulators — sweeping pauses while listening</span>
+        <div class="chart-legend"><span class="tuner-meter" id="sp-meter" title="Audio level"><i></i></span></div>
       </div>
-      <div class="form-field" style="gap:10px">
-        <input type="text" id="sp-listen-freq" style="width:130px" placeholder="433.92M" />
-        <select id="sp-listen-mode" style="width:90px">
-          <option value="fm">FM</option>
-          <option value="am">AM</option>
+      <div class="form-field" style="gap:8px;margin-bottom:10px">
+        <button class="btn btn-sm" id="sp-step-down">−</button>
+        <input type="text" id="sp-listen-freq" class="tuner-freq" placeholder="96.3M" />
+        <button class="btn btn-sm" id="sp-step-up">+</button>
+        <select id="sp-step" style="width:90px" title="Step size">
+          <option value="12500">12.5 kHz</option>
+          <option value="25000" selected>25 kHz</option>
+          <option value="100000">100 kHz</option>
+          <option value="1000000">1 MHz</option>
         </select>
+        <div class="seg" id="sp-demod">
+          <button data-demod="wfm">WFM</button>
+          <button data-demod="nbfm" class="active">NBFM</button>
+          <button data-demod="am">AM</button>
+          <button data-demod="usb">USB</button>
+          <button data-demod="lsb">LSB</button>
+        </div>
+        <label class="form-hint" style="display:flex;align-items:center;gap:6px" title="Mute below this level (NBFM/AM)">Squelch
+          <input type="number" id="sp-squelch" min="0" max="1000" value="0" style="width:70px" /></label>
         <button class="btn btn-sm btn-primary" id="sp-listen-btn">Listen</button>
         <label class="form-hint" style="display:flex;align-items:center;gap:8px">Volume
-          <input type="range" id="sp-volume" min="0" max="100" value="70" style="width:120px" /></label>
+          <input type="range" id="sp-volume" min="0" max="100" value="70" style="width:110px" /></label>
         <span class="form-hint" id="sp-listen-status"></span>
+      </div>
+      <div class="form-field" style="gap:6px">
+        <span class="form-hint">Bookmarks:</span>
+        <div class="preset-chips" id="sp-bookmarks"></div>
+        <button class="btn btn-ghost btn-sm" id="sp-bookmark-add" title="Bookmark the current frequency and demodulator">☆ Save</button>
       </div>
     </div>
     <div class="empty-state" id="sp-empty">
@@ -120,6 +159,58 @@ export function initSpectrum() {
   document.getElementById('sp-volume').addEventListener('input', (e) => {
     if (gainNode) gainNode.gain.value = Number(e.target.value) / 100;
   });
+
+  // tuner controls: steps, demodulator, squelch, bookmarks
+  const stepBy = (dir) => {
+    const hz = parseFreqHz(document.getElementById('sp-listen-freq').value || '96.3M');
+    if (hz == null) return;
+    const step = Number(document.getElementById('sp-step').value);
+    document.getElementById('sp-listen-freq').value = fmtFreqM(hz + dir * step);
+    retuneIfLive();
+  };
+  document.getElementById('sp-step-down').addEventListener('click', () => stepBy(-1));
+  document.getElementById('sp-step-up').addEventListener('click', () => stepBy(1));
+  document.getElementById('sp-listen-freq').addEventListener('change', retuneIfLive);
+  document.getElementById('sp-squelch').addEventListener('change', retuneIfLive);
+  document.getElementById('sp-demod').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-demod]');
+    if (!btn) return;
+    selectedDemod = btn.dataset.demod;
+    for (const b of document.querySelectorAll('#sp-demod button')) {
+      b.classList.toggle('active', b === btn);
+    }
+    retuneIfLive();
+  });
+
+  document.getElementById('sp-bookmarks').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-bm]');
+    if (!chip) return;
+    if (e.target.dataset.bmDel != null) {
+      const bms = store.settings.tunerBookmarks || [];
+      bms.splice(Number(e.target.dataset.bmDel), 1);
+      window.rtl433.saveSettings({ tunerBookmarks: bms }).then((s) => (store.settings = s));
+      renderBookmarks();
+      return;
+    }
+    const bm = (store.settings.tunerBookmarks || [])[Number(chip.dataset.bm)];
+    if (!bm) return;
+    document.getElementById('sp-listen-freq').value = bm.freq;
+    selectedDemod = bm.demod || 'nbfm';
+    for (const b of document.querySelectorAll('#sp-demod button')) {
+      b.classList.toggle('active', b.dataset.demod === selectedDemod);
+    }
+    retuneIfLive();
+  });
+  document.getElementById('sp-bookmark-add').addEventListener('click', async () => {
+    const freq = document.getElementById('sp-listen-freq').value.trim();
+    if (!parseFreqHz(freq)) return window.toast('Enter a frequency first.', 'error');
+    const bms = store.settings.tunerBookmarks || [];
+    bms.push({ name: `${(parseFreqHz(freq) / 1e6).toFixed(3)} MHz`, freq, demod: selectedDemod });
+    store.settings = await window.rtl433.saveSettings({ tunerBookmarks: bms });
+    renderBookmarks();
+    window.toast('Bookmark saved.', 'success');
+  });
+  renderBookmarks();
 
   window.rtl433.onSpectrum((sweep) => {
     lastSweep = sweep;
@@ -278,29 +369,43 @@ function drawWaterfall(sweep) {
   ctx.putImageData(row, 0, 0);
 }
 
-// ---- audio monitor ----
+// ---- tuner / audio monitor ----
+function renderBookmarks() {
+  const host = document.getElementById('sp-bookmarks');
+  const bms = store.settings?.tunerBookmarks || [];
+  host.innerHTML = bms
+    .map(
+      (bm, i) => `<button class="preset-chip" data-bm="${i}" title="${esc(bm.freq)} · ${esc((bm.demod || 'nbfm').toUpperCase())}">
+        ${esc(bm.name)} <span data-bm-del="${i}" title="Remove bookmark" style="opacity:.55;margin-left:4px">✕</span>
+      </button>`
+    )
+    .join('');
+}
+
 function setListenUI(on) {
   listening = on;
   const btn = document.getElementById('sp-listen-btn');
   btn.textContent = on ? 'Stop listening' : 'Listen';
   btn.classList.toggle('btn-danger', on);
   btn.classList.toggle('btn-primary', !on);
-  document.getElementById('sp-listen-status').textContent = on ? 'live audio — sweep paused' : '';
+  if (!on) {
+    document.getElementById('sp-listen-status').textContent = '';
+    setMeter(0);
+  }
 }
 
-async function toggleListen() {
-  if (listening) {
-    await window.rtl433.listenStop();
-    setListenUI(false);
-    return;
-  }
-  const freq = document.getElementById('sp-listen-freq').value.trim() || '433.92M';
-  const demod = document.getElementById('sp-listen-mode').value;
-  const res = await window.rtl433.listenStart({ freq, demod });
+async function startListening() {
+  const freq = document.getElementById('sp-listen-freq').value.trim() || '96.3M';
+  const res = await window.rtl433.listenStart({
+    freq,
+    demod: selectedDemod,
+    squelch: Number(document.getElementById('sp-squelch').value) || 0,
+  });
   if (res.ok === false) {
     window.toast(res.error || 'Could not start audio', 'error');
-    return;
+    return false;
   }
+  audioRate = res.sampleRate || 24000;
   if (!audioCtx) {
     audioCtx = new AudioContext();
     gainNode = audioCtx.createGain();
@@ -309,7 +414,28 @@ async function toggleListen() {
   }
   audioCtx.resume();
   nextAudioTime = 0;
+  document.getElementById('sp-listen-status').textContent =
+    `${(parseFreqHz(freq) / 1e6).toFixed(4)} MHz ${selectedDemod.toUpperCase()} — sweep paused`;
   setListenUI(true);
+  return true;
+}
+
+function retuneIfLive() {
+  if (listening) startListening();
+}
+
+async function toggleListen() {
+  if (listening) {
+    await window.rtl433.listenStop();
+    setListenUI(false);
+    return;
+  }
+  await startListening();
+}
+
+function setMeter(level) {
+  const bar = document.querySelector('#sp-meter i');
+  if (bar) bar.style.width = `${Math.round(Math.min(1, level) * 100)}%`;
 }
 
 function playAudioChunk(data) {
@@ -318,9 +444,18 @@ function playAudioChunk(data) {
   const usable = bytes.length & ~1;
   const samples = new Int16Array(bytes.buffer, bytes.byteOffset, usable / 2);
   if (!samples.length) return;
-  const buf = audioCtx.createBuffer(1, samples.length, 24000);
+  const buf = audioCtx.createBuffer(1, samples.length, audioRate);
   const ch = buf.getChannelData(0);
-  for (let i = 0; i < samples.length; i++) ch[i] = samples[i] / 32768;
+  let sum = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i] / 32768;
+    ch[i] = v;
+    sum += v * v;
+  }
+  // audio level meter with a little decay so it reads smoothly
+  const rms = Math.sqrt(sum / samples.length);
+  meterDecay = Math.max(rms * 2.5, meterDecay * 0.85);
+  setMeter(meterDecay);
   const src = audioCtx.createBufferSource();
   src.buffer = buf;
   src.connect(gainNode);
