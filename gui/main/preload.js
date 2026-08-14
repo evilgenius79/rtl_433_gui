@@ -28,4 +28,13 @@ contextBridge.exposeInMainWorld('rtl433', {
   onAircraft: (cb) => ipcRenderer.on('rt:aircraft', (_e, data) => cb(data)),
   onPager: (cb) => ipcRenderer.on('rt:pager', (_e, data) => cb(data)),
   onSonde: (cb) => ipcRenderer.on('rt:sonde', (_e, data) => cb(data)),
+  onShips: (cb) => ipcRenderer.on('rt:ships', (_e, data) => cb(data)),
+  onSpectrum: (cb) => ipcRenderer.on('rt:spectrum', (_e, data) => cb(data)),
+  onAudio: (cb) => ipcRenderer.on('rt:audio', (_e, data) => cb(data)),
+  onUpdateReady: (cb) => ipcRenderer.on('rt:updateReady', (_e, data) => cb(data)),
+
+  // spectrum listen + event log
+  listenStart: (opts) => ipcRenderer.invoke('rt:listenStart', opts),
+  listenStop: () => ipcRenderer.invoke('rt:listenStop'),
+  openLogFolder: () => ipcRenderer.invoke('rt:openLogFolder'),
 });

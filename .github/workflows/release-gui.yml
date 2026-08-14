@@ -62,6 +62,8 @@ jobs:
           files: |
             gui/dist/*.exe
             gui/dist/*.zip
+            gui/dist/latest.yml
+            gui/dist/*.blockmap
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

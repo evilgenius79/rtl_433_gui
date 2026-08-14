@@ -19,6 +19,7 @@ class Store {
     this.maxPagerMessages = 2000;
     this.totalPagerMessages = 0;
     this.sonde = { sonde: null, trail: [], frames: 0 };
+    this.alerts = []; // fired alert history, newest first
     this.demoMode = false;
     this.settings = null;
     this.startedAt = null;
@@ -183,6 +184,12 @@ class Store {
   setSonde(snap) {
     this.sonde = snap;
     this._notify('sonde');
+  }
+
+  addAlert(alert) {
+    this.alerts.unshift({ ...alert, time: Date.now() });
+    if (this.alerts.length > 200) this.alerts.length = 200;
+    this._notify('alerts');
   }
 
   eventsPerMinute() {

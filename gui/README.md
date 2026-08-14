@@ -71,12 +71,13 @@ CI) — no separate installs needed:
 |---|---|---|
 | `rtl_433.exe` | this repository (GPL-2) | ISM sensor decoding |
 | `rtl_adsb.exe` | osmocom rtl-sdr tools (GPL-2) | raw Mode S frames for the aircraft map |
-| `rtl_fm.exe` | osmocom rtl-sdr tools (GPL-2) | FM demodulation for pagers & radiosondes |
-| `rs41mod.exe` | [rs1729/RS](https://github.com/rs1729/RS) (GPL-3) | RS41 radiosonde telemetry |
+| `rtl_fm.exe` | osmocom rtl-sdr tools (GPL-2) | FM demodulation for pagers, sondes, AIS & listening |
+| `rtl_power.exe` | osmocom rtl-sdr tools (GPL-2) | spectrum sweeps |
+| `rs41mod.exe`, `dfm09mod.exe`, `m10mod.exe`, `m20mod.exe`, `imet54mod.exe` | [rs1729/RS](https://github.com/rs1729/RS) (GPL-3) | radiosonde telemetry |
 
-POCSAG and Mode S/ADS-B decoding is implemented in the app itself
-(`main/pocsag.js`, `main/modes.js`) with unit tests against published
-reference vectors.
+POCSAG, Mode S/ADS-B and AIS decoding is implemented in the app itself
+(`main/pocsag.js`, `main/modes.js`, `main/ais.js`) with unit tests against
+published reference vectors.
 
 The app looks for `rtl_433.exe` in this order:
 

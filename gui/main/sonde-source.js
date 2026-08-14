@@ -11,16 +11,26 @@ const { resolveRtlFm } = require('./pager-source');
 const SAMPLE_RATE = 48000;
 const TRAIL_MAX = 600;
 
-function resolveRs41(configured) {
-  if (configured && configured.trim()) return configured.trim();
-  const exe = process.platform === 'win32' ? 'rs41mod.exe' : 'rs41mod';
+// per-sonde-type decoder binary and its arguments (all from rs1729/RS)
+const SONDE_DECODERS = {
+  rs41: { bin: 'rs41mod', args: ['--ecc', '--crc', '--ptu', '--json'] },
+  dfm09: { bin: 'dfm09mod', args: ['--ecc', '--ptu', '--json'] },
+  m10: { bin: 'm10mod', args: ['--ptu', '--json'] },
+  m20: { bin: 'm20mod', args: ['--ptu', '--json'] },
+  imet54: { bin: 'imet54mod', args: ['--ecc', '--json'] },
+};
+
+function resolveSondeDecoder(configured, type) {
+  const dec = SONDE_DECODERS[type] || SONDE_DECODERS.rs41;
+  if (configured && configured.trim()) return { bin: configured.trim(), args: dec.args };
+  const exe = process.platform === 'win32' ? `${dec.bin}.exe` : dec.bin;
   for (const c of [
     path.join(process.resourcesPath || '.', 'rtl_433', exe),
     path.join(__dirname, '..', 'vendor', 'rtl_433', exe),
   ]) {
-    if (fs.existsSync(c)) return c;
+    if (fs.existsSync(c)) return { bin: c, args: dec.args };
   }
-  return exe;
+  return { bin: exe, args: dec.args };
 }
 
 // rs41mod expects a WAV stream; rtl_fm emits raw s16le, so hand the decoder a
@@ -63,14 +73,14 @@ class SondeSource extends EventEmitter {
   start(settings) {
     if (this.running) return { ok: false, error: 'already running' };
     const fmBin = resolveRtlFm(settings.rtlFmPath);
-    const decBin = resolveRs41(settings.rs41Path);
+    const { bin: decBin, args: decArgsBase } = resolveSondeDecoder(settings.rs41Path, settings.sondeType || 'rs41');
     const freq = settings.sondeFreq || '402.7M';
     const fmArgs = ['-M', 'fm', '-f', String(freq), '-s', String(SAMPLE_RATE)];
     if (settings.sondeDevice) fmArgs.push('-d', String(settings.sondeDevice));
     if (settings.sondeGain !== '' && settings.sondeGain != null) fmArgs.push('-g', String(settings.sondeGain));
     if (settings.ppmError) fmArgs.push('-p', String(settings.ppmError));
     fmArgs.push('-');
-    const decArgs = ['--ecc', '--crc', '--ptu', '--json'];
+    const decArgs = [...decArgsBase];
 
     this.stopping = false;
     this.state = null;
@@ -231,4 +241,4 @@ class SondeSource extends EventEmitter {
   }
 }
 
-module.exports = { SondeSource, resolveRs41, wavHeader };
+module.exports = { SondeSource, resolveSondeDecoder, wavHeader };

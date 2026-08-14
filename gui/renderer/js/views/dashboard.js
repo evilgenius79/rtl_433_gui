@@ -35,6 +35,15 @@ export function initDashboard() {
       ${statTile('rate', 'Events / min', ICONS.rate)}
       ${statTile('uptime', 'Session', ICONS.uptime)}
     </div>
+    <div id="dash-alerts" hidden>
+      <div class="section-head">
+        <h2 class="section-title">Recent alerts</h2>
+        <span class="section-sub" id="dash-alert-count"></span>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost btn-sm" id="dash-alerts-clear">Dismiss</button>
+      </div>
+      <div class="alert-strip" id="dash-alert-list"></div>
+    </div>
     <div class="section-head">
       <h2 class="section-title">Live devices</h2>
       <span class="section-sub" id="dash-devcount"></span>
@@ -60,6 +69,12 @@ export function initDashboard() {
     renderDevices();
   });
 
+  document.getElementById('dash-alerts-clear').addEventListener('click', () => {
+    store.alerts = [];
+    renderAlerts();
+  });
+  store.on('alerts', renderAlerts);
+
   store.on('devices', renderDevices);
   store.on('status', renderStats);
   setInterval(renderStats, 1000);
@@ -72,6 +87,25 @@ export function initDashboard() {
 export function refreshDashboard() {
   renderDevices();
   renderStats();
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const host = document.getElementById('dash-alerts');
+  const alerts = store.alerts.slice(0, 6);
+  host.hidden = alerts.length === 0;
+  if (!alerts.length) return;
+  document.getElementById('dash-alert-count').textContent =
+    `${store.alerts.length} this session`;
+  document.getElementById('dash-alert-list').innerHTML = alerts
+    .map(
+      (a) => `<div class="alert-row">
+      <span class="alert-time">${new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+      <span class="alert-name">${esc(a.rule)}</span>
+      <span class="alert-detail">${esc(a.device)} — ${esc(a.detail)}</span>
+    </div>`
+    )
+    .join('');
 }
 
 function renderStats() {

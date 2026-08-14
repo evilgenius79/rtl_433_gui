@@ -75,12 +75,42 @@ decoded by the bundled reference decoder (`rs41mod` from
 
 ![radiosonde](gui/docs/sonde.png)
 
+**Ship tracking (AIS)** — vessels on marine VHF (161.975/162.025 MHz), decoded
+in-app (HDLC framing, CRC, position and static reports — validated against the
+published AIVDM reference) and drawn on the map with course-rotated markers
+and wakes.
+
+![ships](gui/docs/ships.png)
+
+**Spectrum analyzer** — sweep any range with the bundled `rtl_power`: a live
+trace with max-hold plus a scrolling waterfall, band presets (ISM 433/868,
+pagers, airband, marine), and click-to-read frequencies. An **audio monitor**
+tunes the same dongle with `rtl_fm` so you can *listen* to FM/AM signals you
+spot — click a peak to tune it.
+
+![spectrum](gui/docs/spectrum.png)
+
+**Alert rules** — "notify me when the freezer goes above −15 °C", "when the
+door contact opens between 22:00 and 06:00", "when any new device appears".
+Per-device/metric thresholds with desktop notifications, time windows,
+cooldowns and an alert history on the dashboard.
+
+**MQTT / Home Assistant** — rtl_433's native MQTT output, configured from
+Settings: broker, credentials, retain. Every ISM event flows straight into
+your smart home.
+
 **Multiple dongles, multiple modes at once** — every mode has its own SDR
 device selection, and pipelines run concurrently. With two dongles you can
 watch ISM sensors *and* track aircraft at the same time; the top-bar dropdown
 picks which mode the Start/Stop button controls, and the status pill shows
 everything that's running. With one dongle, run any single mode — the app
 warns if two modes would fight over the same device.
+
+**Quality of life** — aircraft colored by altitude with airline lookup, range
+rings and a coverage plot around your receiver location, five radiosonde types
+(RS41, DFM, M10, M20, iMet-54), close-to-tray for 24/7 monitoring, daily
+NDJSON event logging with retention, and automatic updates from GitHub
+Releases.
 
 **Console** — the raw rtl_433 stderr stream with timestamps, for
 troubleshooting driver, gain or decoder issues.

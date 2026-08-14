@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, clipboard, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { Settings } = require('./settings');
@@ -11,6 +11,10 @@ const { PagerSource } = require('./pager-source');
 const { DemoPagerSource } = require('./demo-pager');
 const { SondeSource } = require('./sonde-source');
 const { DemoSondeSource } = require('./demo-sonde');
+const { ShipsSource } = require('./ships-source');
+const { DemoShipsSource } = require('./demo-ships');
+const { SpectrumSource } = require('./spectrum-source');
+const { DemoSpectrumSource } = require('./demo-spectrum');
 
 let win = null;
 let settings = null;
@@ -22,6 +26,10 @@ const pager = new PagerSource();
 const demoPager = new DemoPagerSource();
 const sonde = new SondeSource();
 const demoSonde = new DemoSondeSource();
+const ships = new ShipsSource();
+const demoShips = new DemoShipsSource();
+const spectrum = new SpectrumSource();
+const demoSpectrum = new DemoSpectrumSource();
 
 // Each receiver mode has a real pipeline and a demo twin; with two (or more)
 // dongles several modes can run at once, each bound to its own SDR device.
@@ -30,6 +38,8 @@ const MODES = {
   adsb: { real: adsb, demo: demoAdsb, isDemoRunning: () => demoAdsb.isRunning },
   pocsag: { real: pager, demo: demoPager, isDemoRunning: () => demoPager.isRunning },
   sonde: { real: sonde, demo: demoSonde, isDemoRunning: () => demoSonde.isRunning },
+  ais: { real: ships, demo: demoShips, isDemoRunning: () => demoShips.isRunning },
+  spectrum: { real: spectrum, demo: demoSpectrum, isDemoRunning: () => demoSpectrum.isRunning },
 };
 
 let demoMode = process.argv.includes('--demo');
@@ -68,6 +78,13 @@ for (const src of [pager, demoPager]) {
 for (const src of [sonde, demoSonde]) {
   src.on('sonde', (snap) => send('rt:sonde', snap));
 }
+for (const src of [ships, demoShips]) {
+  src.on('ships', (snap) => send('rt:ships', snap));
+}
+for (const src of [spectrum, demoSpectrum]) {
+  src.on('spectrum', (sweep) => send('rt:spectrum', sweep));
+}
+spectrum.on('audio', (buf) => send('rt:audio', buf));
 
 function anyRunning() {
   return Object.keys(MODES).some(modeRunning);
@@ -138,6 +155,14 @@ function createWindow() {
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
 
+  // close-to-tray keeps receivers running in the background
+  win.on('close', (e) => {
+    if (!quitting && settings && settings.data.closeToTray && tray) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
+
   // optional: begin receiving as soon as the app opens
   if (!process.env.RTL433_SCREENSHOT_DIR) {
     win.webContents.once('did-finish-load', () => {
@@ -160,6 +185,9 @@ function createWindow() {
 app.whenReady().then(() => {
   settings = new Settings(app.getPath('userData'));
   createWindow();
+  setupTray();
+  setupAutoUpdate();
+  pruneEventLog();
   if (process.env.RTL433_SCREENSHOT_DIR) captureScreenshots(process.env.RTL433_SCREENSHOT_DIR);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -190,11 +218,13 @@ async function captureScreenshots(outDir) {
       demoAdsb.start();
       demoPager.start();
       demoSonde.start();
+      demoShips.start();
+      demoSpectrum.start();
       await win.webContents.executeJavaScript(
         `document.querySelector('.nav-item[data-view="aircraft"]').click()`
       );
       await sleep(Number(process.env.RTL433_SCREENSHOT_AIR_WAIT || 12000));
-      for (const view of ['aircraft', 'pagers', 'sonde']) {
+      for (const view of ['aircraft', 'pagers', 'sonde', 'ships', 'spectrum']) {
         await win.webContents.executeJavaScript(
           `document.querySelector('.nav-item[data-view="${view}"]').click()`
         );
@@ -217,6 +247,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  quitting = true;
   stopAll();
 });
 
@@ -262,6 +293,101 @@ ipcMain.handle('rt:copyText', (_e, text) => {
 });
 
 ipcMain.handle('rt:version', () => app.getVersion());
+
+// spectrum listen (audio monitor) — shares the spectrum mode's dongle
+ipcMain.handle('rt:listenStart', (_e, opts) => {
+  if (demoMode) return { ok: false, error: 'listening is not available in demo mode' };
+  return spectrum.startListen(settings.data, opts || {});
+});
+ipcMain.handle('rt:listenStop', () => {
+  if (demoMode) return { ok: true };
+  return spectrum.stopListen(settings.data);
+});
+
+// ---- durable event log: one NDJSON file per day in the user-data dir ----
+const LOG_DIRNAME = 'event-log';
+function logDir() {
+  return path.join(app.getPath('userData'), LOG_DIRNAME);
+}
+function appendEventLog(evt) {
+  if (!settings || !settings.data.logEvents) return;
+  try {
+    fs.mkdirSync(logDir(), { recursive: true });
+    const day = new Date().toISOString().slice(0, 10);
+    fs.appendFile(path.join(logDir(), `events-${day}.ndjson`), JSON.stringify(evt) + '\n', () => {});
+  } catch (e) {
+    /* non-fatal */
+  }
+}
+function pruneEventLog() {
+  if (!settings) return;
+  const keep = Math.max(1, Number(settings.data.logRetentionDays) || 14);
+  try {
+    const cutoff = Date.now() - keep * 86400000;
+    for (const f of fs.readdirSync(logDir())) {
+      const m = f.match(/^events-(\d{4}-\d{2}-\d{2})\.ndjson$/);
+      if (m && Date.parse(m[1]) < cutoff) fs.unlinkSync(path.join(logDir(), f));
+    }
+  } catch (e) {
+    /* no log dir yet */
+  }
+}
+for (const src of [proc, demo]) src.on('event', appendEventLog);
+setInterval(pruneEventLog, 6 * 3600000);
+
+ipcMain.handle('rt:openLogFolder', () => {
+  try {
+    fs.mkdirSync(logDir(), { recursive: true });
+    shell.openPath(logDir());
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// ---- system tray ----
+let tray = null;
+let quitting = false;
+function setupTray() {
+  try {
+    const img = nativeImage
+      .createFromPath(path.join(__dirname, '..', 'assets', 'icon.png'))
+      .resize({ width: 16, height: 16 });
+    tray = new Tray(img);
+    tray.setToolTip('rtl_433 GUI');
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: 'Show', click: () => { if (win) { win.show(); win.focus(); } } },
+        { type: 'separator' },
+        { label: 'Stop all receivers', click: () => stopAll() },
+        { type: 'separator' },
+        { label: 'Quit', click: () => { quitting = true; app.quit(); } },
+      ])
+    );
+    tray.on('click', () => { if (win) { win.show(); win.focus(); } });
+  } catch (e) {
+    /* tray unavailable in some environments — not fatal */
+  }
+}
+
+// ---- auto-update (packaged builds only; fails silently offline) ----
+function setupAutoUpdate() {
+  if (!app.isPackaged) return;
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-downloaded', (info) => {
+      send('rt:log', { stream: 'app', line: `update ${info.version} downloaded — it will install when the app quits` });
+      send('rt:updateReady', { version: info.version });
+    });
+    autoUpdater.on('error', () => {});
+    autoUpdater.checkForUpdates().catch(() => {});
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 3600000);
+  } catch (e) {
+    /* updater not available */
+  }
+}
 
 ipcMain.handle('rt:getStatus', () => ({
   demoMode,

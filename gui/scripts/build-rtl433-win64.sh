@@ -47,6 +47,7 @@ fi
 sed -i \
     -e 's/target_link_libraries(rtl_adsb rtlsdr convenience_static/target_link_libraries(rtl_adsb rtlsdr_static convenience_static/' \
     -e 's/target_link_libraries(rtl_fm rtlsdr convenience_static/target_link_libraries(rtl_fm rtlsdr_static convenience_static/' \
+    -e 's/target_link_libraries(rtl_power rtlsdr convenience_static/target_link_libraries(rtl_power rtlsdr_static convenience_static/' \
     rtl-sdr-${rtlsdr_ver}/src/CMakeLists.txt
 if [ ! -e "$sysroot/usr/lib/librtlsdr.a" ]; then
     export CMAKE_SYSROOT=$sysroot
@@ -74,20 +75,25 @@ cmake --build build-rtl433
 cmake --install build-rtl433
 rm -rf build-rtl433
 
-# rs41mod: the reference RS41 radiosonde decoder from rs1729/RS (GPL-3),
-# reads FM-demodulated s16 audio on stdin and emits JSON telemetry per frame
+# radiosonde decoders from rs1729/RS (GPL-3): read FM-demodulated s16 audio
+# on stdin and emit JSON telemetry per frame
 if [ ! -d RS ]; then
     git clone --depth 1 https://github.com/rs1729/RS
 fi
-x86_64-w64-mingw32-gcc -O2 -static -o rs41mod.exe \
-    RS/demod/mod/rs41mod.c RS/demod/mod/demod_mod.c RS/demod/mod/bch_ecc_mod.c -lm -w
+for dec in rs41mod dfm09mod m10mod m20mod imet54mod; do
+    src="RS/demod/mod/${dec}.c"
+    [ "$dec" = m20mod ] && src="RS/demod/mod/m10m20mod.c"
+    x86_64-w64-mingw32-gcc -O2 -static -o ${dec}.exe \
+        "$src" RS/demod/mod/demod_mod.c RS/demod/mod/bch_ecc_mod.c -lm -w
+done
 
 out="$gui_dir/vendor/rtl_433"
 mkdir -p "$out"
 cp "$sysroot/usr/bin/rtl_433.exe" "$out/rtl_433.exe"
 # rtl_adsb feeds the aircraft map with raw Mode S frames; rtl_fm feeds the
-# pager and radiosonde pipelines with FM-demodulated audio
+# pager / radiosonde / AIS / listen pipelines; rtl_power feeds the spectrum
 cp "$sysroot/usr/bin/rtl_adsb.exe" "$out/rtl_adsb.exe"
 cp "$sysroot/usr/bin/rtl_fm.exe" "$out/rtl_fm.exe"
-cp rs41mod.exe "$out/rs41mod.exe"
-echo "Bundled binaries ready in $out: rtl_433, rtl_adsb, rtl_fm, rs41mod"
+cp "$sysroot/usr/bin/rtl_power.exe" "$out/rtl_power.exe"
+cp rs41mod.exe dfm09mod.exe m10mod.exe m20mod.exe imet54mod.exe "$out/"
+echo "Bundled binaries ready in $out: $(ls "$out" | tr '\n' ' ')"

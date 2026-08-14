@@ -38,6 +38,14 @@ export async function initSettings() {
           <div class="form-hint">RTL-SDR index (0,1,…), :serial, or a SoapySDR query. Empty = first device. With two dongles, give each mode its own index so they can run at the same time.</div></div>
         <div class="form-field"><input type="text" id="s-device" class="wide" placeholder="0" /></div>
       </div>
+      <div class="form-row">
+        <div><div class="form-label">Receiver location</div>
+          <div class="form-hint">Your antenna's coordinates — enables range rings, max-range and coverage on the maps.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-rxlat" style="width:120px" placeholder="lat, e.g. 52.1" />
+          <input type="text" id="s-rxlon" style="width:120px" placeholder="lon, e.g. -0.4" />
+        </div>
+      </div>
     </div>
 
     <div class="settings-card">
@@ -121,8 +129,21 @@ export async function initSettings() {
     </div>
 
     <div class="settings-card">
-      <h3>Radiosonde (RS41)</h3>
-      <div class="card-sub">Weather balloons at 400–406 MHz, decoded by the bundled rs41mod (rs1729/RS).</div>
+      <h3>Radiosonde</h3>
+      <div class="card-sub">Weather balloons at 400–406 MHz, decoded by the bundled rs1729/RS decoders.</div>
+      <div class="form-row">
+        <div><div class="form-label">Sonde type</div>
+          <div class="form-hint">RS41 is the most common worldwide; pick the type flown near you.</div></div>
+        <div class="form-field">
+          <select id="s-sd-type">
+            <option value="rs41">RS41 (Vaisala)</option>
+            <option value="dfm09">DFM-09/17 (Graw)</option>
+            <option value="m10">M10 (Meteomodem)</option>
+            <option value="m20">M20 (Meteomodem)</option>
+            <option value="imet54">iMet-54</option>
+          </select>
+        </div>
+      </div>
       <div class="form-row">
         <div><div class="form-label">SDR device</div>
           <div class="form-hint">Dongle index for the sonde receiver.</div></div>
@@ -139,6 +160,115 @@ export async function initSettings() {
       <div class="form-row">
         <div><div class="form-label">Gain</div><div class="form-hint">Empty = automatic.</div></div>
         <div class="form-field"><input type="text" id="s-sd-gain" style="width:110px" placeholder="auto" /> <span class="form-hint">dB</span></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>AIS ships</h3>
+      <div class="card-sub">Vessel traffic on marine VHF, decoded in-app from the bundled rtl_fm.</div>
+      <div class="form-row">
+        <div><div class="form-label">SDR device</div><div class="form-hint">Dongle index for the AIS receiver.</div></div>
+        <div class="form-field"><input type="text" id="s-ais-dev" style="width:110px" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Channel</div>
+          <div class="form-hint">Vessels alternate between both channels; either works.</div></div>
+        <div class="form-field">
+          <select id="s-ais-freq">
+            <option value="161.975M">A — 161.975 MHz</option>
+            <option value="162.025M">B — 162.025 MHz</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Gain</div><div class="form-hint">Empty = automatic.</div></div>
+        <div class="form-field"><input type="text" id="s-ais-gain" style="width:110px" placeholder="auto" /> <span class="form-hint">dB</span></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Spectrum</h3>
+      <div class="card-sub">Band sweeping with the bundled rtl_power; presets are on the Spectrum view.</div>
+      <div class="form-row">
+        <div><div class="form-label">SDR device</div><div class="form-hint">Dongle index for sweeping and the audio monitor.</div></div>
+        <div class="form-field"><input type="text" id="s-sp-dev" style="width:110px" placeholder="0" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Range</div>
+          <div class="form-hint">Start, stop and bin size for the sweep.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-sp-start" style="width:100px" placeholder="433M" />
+          <span class="form-hint">to</span>
+          <input type="text" id="s-sp-stop" style="width:100px" placeholder="435M" />
+          <span class="form-hint">step</span>
+          <input type="text" id="s-sp-step" style="width:80px" placeholder="10k" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Sweep interval</div><div class="form-hint">Seconds of integration per sweep row.</div></div>
+        <div class="form-field"><input type="number" id="s-sp-int" min="1" style="width:90px" /> <span class="form-hint">s</span></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Gain</div><div class="form-hint">Empty = automatic.</div></div>
+        <div class="form-field"><input type="text" id="s-sp-gain" style="width:110px" placeholder="auto" /> <span class="form-hint">dB</span></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>MQTT</h3>
+      <div class="card-sub">rtl_433 publishes every ISM event straight to your broker — ideal for Home Assistant.</div>
+      <div class="form-row">
+        <div class="form-label">Enable MQTT output</div>
+        <div class="form-field"><input type="checkbox" id="s-mq-on" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Broker</div><div class="form-hint">Host and port of your MQTT broker.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-mq-host" style="width:180px" placeholder="127.0.0.1" />
+          <input type="number" id="s-mq-port" style="width:90px" placeholder="1883" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Credentials</div><div class="form-hint">Leave empty for anonymous access.</div></div>
+        <div class="form-field">
+          <input type="text" id="s-mq-user" style="width:140px" placeholder="user" />
+          <input type="password" id="s-mq-pass" style="width:140px" placeholder="password" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Retain messages</div>
+          <div class="form-hint">Keep the last value on each topic for new subscribers.</div></div>
+        <div class="form-field"><input type="checkbox" id="s-mq-retain" /></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Alert rules</h3>
+      <div class="card-sub">Fire a desktop notification when a device reports something noteworthy. Alerts respect a 5-minute per-device cooldown.</div>
+      <div id="s-alert-list"></div>
+      <div class="form-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px">
+        <div class="form-label">New rule</div>
+        <div class="form-field" style="gap:8px">
+          <input type="text" id="s-al-name" style="width:130px" placeholder="Name" />
+          <select id="s-al-device" style="max-width:170px"><option value="">Any device</option></select>
+          <input type="text" id="s-al-metric" style="width:130px" placeholder="metric, e.g. temperature_C" list="s-al-metrics" />
+          <datalist id="s-al-metrics">
+            <option value="temperature_C"></option><option value="humidity"></option>
+            <option value="moisture"></option><option value="battery_ok"></option>
+            <option value="state"></option><option value="wind_avg_km_h"></option>
+            <option value="pressure_kPa"></option>
+          </datalist>
+          <select id="s-al-op" style="width:110px">
+            <option value=">">&gt;</option><option value="<">&lt;</option>
+            <option value=">=">&ge;</option><option value="<=">&le;</option>
+            <option value="==">equals</option><option value="changes">changes</option>
+            <option value="any">any event</option>
+          </select>
+          <input type="text" id="s-al-value" style="width:80px" placeholder="value" />
+          <input type="text" id="s-al-from" style="width:70px" placeholder="from hh:mm" title="Optional time window start" />
+          <input type="text" id="s-al-to" style="width:70px" placeholder="to hh:mm" title="Optional time window end" />
+          <button class="btn btn-sm" id="s-al-add">Add rule</button>
+        </div>
       </div>
     </div>
 
@@ -184,6 +314,17 @@ export async function initSettings() {
           <div class="form-hint">Include RSSI / SNR / noise with each event.</div></div>
         <div class="form-field"><input type="checkbox" id="s-level" /></div>
       </div>
+      <div class="form-row">
+        <div><div class="form-label">Log events to disk</div>
+          <div class="form-hint">Append every ISM event to a daily NDJSON file for long-term analysis.</div></div>
+        <div class="form-field">
+          <input type="checkbox" id="s-log" />
+          <span class="form-hint">keep</span>
+          <input type="number" id="s-log-days" min="1" style="width:70px" />
+          <span class="form-hint">days</span>
+          <button class="btn btn-sm" id="s-log-open">Open log folder</button>
+        </div>
+      </div>
     </div>
 
     <div class="settings-card">
@@ -208,6 +349,11 @@ export async function initSettings() {
         <div><div class="form-label">Notify on low battery</div>
           <div class="form-hint">Desktop notification (once per device) when a sensor reports low battery.</div></div>
         <div class="form-field"><input type="checkbox" id="s-notifybatt" /></div>
+      </div>
+      <div class="form-row">
+        <div><div class="form-label">Close to tray</div>
+          <div class="form-hint">Closing the window keeps receivers running in the system tray.</div></div>
+        <div class="form-field"><input type="checkbox" id="s-tray" /></div>
       </div>
     </div>
 
@@ -249,6 +395,27 @@ export async function initSettings() {
   g('s-sd-dev').value = draft.sondeDevice || '';
   g('s-sd-freq').value = draft.sondeFreq || '402.7M';
   g('s-sd-gain').value = draft.sondeGain ?? '';
+  g('s-sd-type').value = draft.sondeType || 'rs41';
+  g('s-rxlat').value = draft.receiverLat || '';
+  g('s-rxlon').value = draft.receiverLon || '';
+  g('s-ais-dev').value = draft.aisDevice || '';
+  g('s-ais-freq').value = draft.aisFreq || '161.975M';
+  g('s-ais-gain').value = draft.aisGain ?? '';
+  g('s-sp-dev').value = draft.spectrumDevice || '';
+  g('s-sp-start').value = draft.spectrumStart || '433M';
+  g('s-sp-stop').value = draft.spectrumStop || '435M';
+  g('s-sp-step').value = draft.spectrumStep || '10k';
+  g('s-sp-int').value = draft.spectrumInterval || 1;
+  g('s-sp-gain').value = draft.spectrumGain ?? '';
+  g('s-mq-on').checked = !!draft.mqttEnabled;
+  g('s-mq-host').value = draft.mqttHost || '127.0.0.1';
+  g('s-mq-port').value = draft.mqttPort || 1883;
+  g('s-mq-user').value = draft.mqttUser || '';
+  g('s-mq-pass').value = draft.mqttPass || '';
+  g('s-mq-retain').checked = !!draft.mqttRetain;
+  g('s-log').checked = !!draft.logEvents;
+  g('s-log-days').value = draft.logRetentionDays || 14;
+  g('s-tray').checked = !!draft.closeToTray;
 
   // regional presets for the pager and sonde bands
   const chipRow = (hostId, inputId, presets) => {
@@ -359,6 +526,28 @@ export async function initSettings() {
       sondeDevice: g('s-sd-dev').value.trim(),
       sondeFreq: g('s-sd-freq').value.trim() || '402.7M',
       sondeGain: g('s-sd-gain').value.trim(),
+      sondeType: g('s-sd-type').value,
+      receiverLat: g('s-rxlat').value.trim(),
+      receiverLon: g('s-rxlon').value.trim(),
+      aisDevice: g('s-ais-dev').value.trim(),
+      aisFreq: g('s-ais-freq').value,
+      aisGain: g('s-ais-gain').value.trim(),
+      spectrumDevice: g('s-sp-dev').value.trim(),
+      spectrumStart: g('s-sp-start').value.trim() || '433M',
+      spectrumStop: g('s-sp-stop').value.trim() || '435M',
+      spectrumStep: g('s-sp-step').value.trim() || '10k',
+      spectrumInterval: Number(g('s-sp-int').value) || 1,
+      spectrumGain: g('s-sp-gain').value.trim(),
+      mqttEnabled: g('s-mq-on').checked,
+      mqttHost: g('s-mq-host').value.trim(),
+      mqttPort: Number(g('s-mq-port').value) || 1883,
+      mqttUser: g('s-mq-user').value.trim(),
+      mqttPass: g('s-mq-pass').value,
+      mqttRetain: g('s-mq-retain').checked,
+      logEvents: g('s-log').checked,
+      logRetentionDays: Number(g('s-log-days').value) || 14,
+      closeToTray: g('s-tray').checked,
+      alertRules: draft.alertRules || [],
       autoStart: g('s-autostart').checked,
       autoRestart: g('s-autorestart').checked,
       notifyNewDevice: g('s-notifynew').checked,
@@ -378,6 +567,74 @@ export async function initSettings() {
     await window.rtl433.copyText(cmd);
     window.toast('Copied: ' + (cmd.length > 96 ? cmd.slice(0, 96) + '…' : cmd), 'success');
   });
+
+  g('s-log-open').addEventListener('click', () => window.rtl433.openLogFolder());
+
+  // ---- alert rules editor ----
+  function renderAlertRules() {
+    const host = g('s-alert-list');
+    const rules = draft.alertRules || [];
+    host.innerHTML = rules.length
+      ? rules
+          .map(
+            (r, i) => `<div class="proto-row" style="gap:8px">
+          <input type="checkbox" data-al-toggle="${i}" ${r.enabled ? 'checked' : ''} title="Enabled" />
+          <span style="font-weight:600;min-width:110px">${r.name ? String(r.name).replace(/</g, '&lt;') : 'Rule'}</span>
+          <span style="color:var(--text-2);flex:1">${r.deviceKey ? String(r.deviceKey).split('|')[0] : 'any device'} ·
+            ${r.op === 'any' ? 'any event' : `${r.metric} ${r.op === 'changes' ? 'changes' : `${r.op} ${r.value}`}`}
+            ${r.from && r.to ? ` · ${r.from}–${r.to}` : ''}</span>
+          <button class="btn btn-ghost btn-sm" data-al-del="${i}">✕</button>
+        </div>`
+          )
+          .join('')
+      : '<div class="proto-row" style="color:var(--text-3)">No rules yet — add one below.</div>';
+  }
+  g('s-alert-list').addEventListener('click', (e) => {
+    const del = e.target.dataset.alDel;
+    if (del != null) {
+      draft.alertRules.splice(Number(del), 1);
+      renderAlertRules();
+    }
+  });
+  g('s-alert-list').addEventListener('change', (e) => {
+    const idx = e.target.dataset.alToggle;
+    if (idx != null) draft.alertRules[Number(idx)].enabled = e.target.checked;
+  });
+  // device dropdown from currently-known devices
+  {
+    const sel = g('s-al-device');
+    for (const dev of store.devices.values()) {
+      const o = document.createElement('option');
+      o.value = dev.key;
+      o.textContent = `${dev.model}${dev.id != null ? ` #${dev.id}` : ''}`;
+      sel.appendChild(o);
+    }
+  }
+  g('s-al-add').addEventListener('click', () => {
+    const op = g('s-al-op').value;
+    const metric = g('s-al-metric').value.trim();
+    if (op !== 'any' && !metric) return window.toast('Pick a metric for the rule.', 'error');
+    if (['>', '<', '>=', '<=', '=='].includes(op) && !g('s-al-value').value.trim()) {
+      return window.toast('The rule needs a comparison value.', 'error');
+    }
+    draft.alertRules = draft.alertRules || [];
+    draft.alertRules.push({
+      id: 'al' + Date.now().toString(36),
+      name: g('s-al-name').value.trim() || `${metric || 'event'} ${op}`,
+      enabled: true,
+      deviceKey: g('s-al-device').value,
+      metric,
+      op,
+      value: g('s-al-value').value.trim(),
+      from: g('s-al-from').value.trim(),
+      to: g('s-al-to').value.trim(),
+    });
+    g('s-al-name').value = '';
+    g('s-al-value').value = '';
+    renderAlertRules();
+    window.toast('Rule added — remember to Save settings.');
+  });
+  renderAlertRules();
 
   function updateProtoSub() {
     const sub = g('s-proto-sub');

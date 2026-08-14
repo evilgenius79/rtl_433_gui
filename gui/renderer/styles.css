@@ -777,7 +777,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
   box-shadow: var(--shadow-card);
   background: #10131a;
 }
-#air-map, #sd-map { position: absolute; inset: 0; background: #10131a; }
+#air-map, #sd-map, #sh-map { position: absolute; inset: 0; background: #10131a; }
 
 /* dark-mode map: invert the raster tiles, then tame the colors */
 .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.35); }
@@ -876,6 +876,67 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 }
 .sd-kv span:first-child { color: var(--text-3); }
 .sd-kv span:last-child { font-variant-numeric: tabular-nums; font-weight: 550; }
+
+/* altitude legend (aircraft) */
+.alt-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.alt-legend i {
+  width: 90px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, hsl(25,75%,58%), hsl(85,75%,58%), hsl(150,75%,58%), hsl(210,75%,58%), hsl(270,75%,58%));
+}
+.ring-label {
+  color: var(--text-3);
+  font-size: 10px;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+/* spectrum */
+.sp-wrap { position: relative; }
+.sp-wrap canvas { display: block; width: 100%; border-radius: 6px; }
+#sp-trace { margin-bottom: 6px; }
+.sp-readout {
+  position: absolute;
+  top: 6px;
+  background: #262b35;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* alerts */
+.alert-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+.alert-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  background: rgba(208, 59, 59, 0.08);
+  border: 1px solid rgba(208, 59, 59, 0.3);
+  border-left: 3px solid var(--crit);
+  border-radius: var(--radius-sm);
+  padding: 7px 13px;
+  font-size: 12.8px;
+}
+.alert-time { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.alert-name { font-weight: 650; }
+.alert-detail { color: var(--text-2); }
 
 /* topbar mode select */
 .mode-select {

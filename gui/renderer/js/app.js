@@ -7,6 +7,8 @@ import { initCharts, rerenderCharts } from './views/charts.js';
 import { initAircraft, refreshAircraft } from './views/aircraft.js';
 import { initPagers, refreshPagers } from './views/pagers.js';
 import { initSonde, refreshSonde } from './views/sonde.js';
+import { initShips, refreshShips } from './views/ships.js';
+import { initSpectrum, refreshSpectrum } from './views/spectrum.js';
 import { initConsole } from './views/console.js';
 import { initSettings } from './views/settings.js';
 
@@ -17,14 +19,19 @@ const VIEW_TITLES = {
   aircraft: 'Aircraft',
   pagers: 'Pagers',
   sonde: 'Radiosonde',
+  ships: 'Ships',
+  spectrum: 'Spectrum',
   console: 'Console',
   settings: 'Settings',
 };
 
-const MODE_NAMES = { ism: 'ISM', adsb: 'ADS-B', pocsag: 'Pagers', sonde: 'Sonde' };
-const MODE_HOME_VIEW = { ism: 'dashboard', adsb: 'aircraft', pocsag: 'pagers', sonde: 'sonde' };
+const MODE_NAMES = { ism: 'ISM', adsb: 'ADS-B', pocsag: 'Pagers', sonde: 'Sonde', ais: 'AIS', spectrum: 'Spectrum' };
+const MODE_HOME_VIEW = { ism: 'dashboard', adsb: 'aircraft', pocsag: 'pagers', sonde: 'sonde', ais: 'ships', spectrum: 'spectrum' };
 // which device-setting key each mode's pipeline uses (for conflict warnings)
-const MODE_DEVICE_KEY = { ism: 'device', adsb: 'adsbDevice', pocsag: 'pagerDevice', sonde: 'sondeDevice' };
+const MODE_DEVICE_KEY = {
+  ism: 'device', adsb: 'adsbDevice', pocsag: 'pagerDevice',
+  sonde: 'sondeDevice', ais: 'aisDevice', spectrum: 'spectrumDevice',
+};
 
 let currentView = 'dashboard';
 
@@ -46,6 +53,8 @@ function showView(name) {
   if (name === 'aircraft') refreshAircraft();
   if (name === 'pagers') refreshPagers();
   if (name === 'sonde') refreshSonde();
+  if (name === 'ships') refreshShips();
+  if (name === 'spectrum') refreshSpectrum();
 }
 
 // ---- toasts ----
@@ -119,6 +128,10 @@ window.updateFreqChip = () => {
     text = fmtFreq(store.settings?.pagerFreq || '169.65M');
   } else if (mode === 'sonde') {
     text = fmtFreq(store.settings?.sondeFreq || '402.7M');
+  } else if (mode === 'ais') {
+    text = fmtFreq(store.settings?.aisFreq || '161.975M');
+  } else if (mode === 'spectrum') {
+    text = `${fmtFreq(store.settings?.spectrumStart || '433M')} – ${fmtFreq(store.settings?.spectrumStop || '435M')}`;
   } else {
     const freqs = store.settings?.frequencies?.filter((f) => String(f).trim()) || [];
     if (freqs.length) text = freqs.map(fmtFreq).join(' ⇄ ');
@@ -205,12 +218,71 @@ async function main() {
       : 'Demo mode off — Start will run rtl_433.');
   });
 
+  // ---- alert rules ----
+  const alertCooldowns = new Map(); // ruleId|deviceKey -> last fired
+  const alertLastValue = new Map(); // ruleId|deviceKey -> previous value (op: changes)
+  function inTimeWindow(rule) {
+    if (!rule.from || !rule.to) return true;
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const [fh, fm] = rule.from.split(':').map(Number);
+    const [th, tm] = rule.to.split(':').map(Number);
+    const from = fh * 60 + (fm || 0);
+    const to = th * 60 + (tm || 0);
+    return from <= to ? cur >= from && cur <= to : cur >= from || cur <= to; // window may cross midnight
+  }
+  function evalAlerts(evt, key) {
+    const rules = store.settings?.alertRules || [];
+    for (const rule of rules) {
+      if (!rule.enabled) continue;
+      if (rule.deviceKey && rule.deviceKey !== key) continue;
+      if (!inTimeWindow(rule)) continue;
+      const raw = rule.metric ? evt[rule.metric] : undefined;
+      let hit = false;
+      let detail = '';
+      const ck = `${rule.id}|${key}`;
+      if (rule.op === 'any') {
+        hit = true;
+        detail = 'transmission received';
+      } else if (raw === undefined) {
+        continue;
+      } else if (rule.op === 'changes') {
+        const prev = alertLastValue.get(ck);
+        alertLastValue.set(ck, raw);
+        hit = prev !== undefined && String(prev) !== String(raw);
+        detail = `${rule.metric}: ${prev} → ${raw}`;
+      } else {
+        const num = Number(raw);
+        const target = Number(rule.value);
+        if (rule.op === '>') hit = num > target;
+        else if (rule.op === '<') hit = num < target;
+        else if (rule.op === '>=') hit = num >= target;
+        else if (rule.op === '<=') hit = num <= target;
+        else if (rule.op === '==') hit = String(raw) === String(rule.value);
+        detail = `${rule.metric} = ${raw}`;
+      }
+      if (!hit) continue;
+      const last = alertCooldowns.get(ck) || 0;
+      if (Date.now() - last < 300000) continue; // 5 min per rule+device
+      alertCooldowns.set(ck, Date.now());
+      const devName = `${evt.model || 'Unknown'}${evt.id != null ? ` #${evt.id}` : ''}`;
+      store.addAlert({ rule: rule.name || 'Alert', device: devName, detail });
+      try {
+        new Notification(`⚠ ${rule.name || 'Alert'}`, { body: `${devName} — ${detail}` });
+      } catch (e) {
+        /* notifications unavailable */
+      }
+      window.toast(`Alert: ${rule.name || 'rule'} — ${devName} (${detail})`, 'error');
+    }
+  }
+
   // IPC streams
   const batteryNotified = new Set(); // one low-battery notification per device per session
   window.rtl433.onEvent((evt) => {
     const key = deviceKey(evt);
     const isNew = !store.devices.has(key);
     store.addEvent(evt);
+    evalAlerts(evt, key);
     // desktop notifications (opt-in via Settings → Behavior)
     const s = store.settings || {};
     const name = `${evt.model || 'Unknown'}${evt.id != null ? ` #${evt.id}` : ''}`;
@@ -238,6 +310,11 @@ async function main() {
   // pager stream
   window.rtl433.onPager((msg) => store.addPagerMessage(msg));
 
+  // auto-update notifications (packaged builds)
+  window.rtl433.onUpdateReady(({ version }) => {
+    window.toast(`Update ${version} downloaded — it will install when you quit the app.`, 'success');
+  });
+
   // views
   initDashboard();
   initEvents();
@@ -245,6 +322,8 @@ async function main() {
   initAircraft();
   initPagers();
   initSonde();
+  initShips();
+  initSpectrum();
   initConsole();
   initSettings();
 
@@ -266,9 +345,9 @@ async function main() {
     /* non-fatal */
   }
 
-  // keyboard shortcuts: Ctrl+1..8 switch views
+  // keyboard shortcuts: Ctrl+1..9 switch views
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key >= '1' && e.key <= '8') {
+    if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
       showView(Object.keys(VIEW_TITLES)[Number(e.key) - 1]);
       e.preventDefault();
     }

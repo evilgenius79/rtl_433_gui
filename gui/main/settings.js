@@ -38,7 +38,35 @@ const DEFAULTS = {
   sondeFreq: '402.7M', // RS41 radiosonde frequency (400.05-406 MHz band)
   sondeGain: '',
   rtlFmPath: '', // rtl_fm binary override; empty = bundled copy
-  rs41Path: '', // rs41mod binary override; empty = bundled copy
+  rs41Path: '', // sonde decoder binary override; empty = bundled copy
+  sondeType: 'rs41', // rs41 | dfm09 | m10 | m20 | imet54
+  // AIS ships (162 MHz)
+  aisDevice: '',
+  aisFreq: '161.975M', // channel A; B = 162.025M
+  aisGain: '',
+  // Spectrum sweep (rtl_power)
+  spectrumDevice: '',
+  spectrumStart: '433M',
+  spectrumStop: '435M',
+  spectrumStep: '10k',
+  spectrumInterval: 1, // seconds per sweep
+  spectrumGain: '',
+  // MQTT republishing (rtl_433's native -F mqtt output)
+  mqttEnabled: false,
+  mqttHost: '127.0.0.1',
+  mqttPort: 1883,
+  mqttUser: '',
+  mqttPass: '',
+  mqttRetain: false,
+  // receiver site (range rings on the maps)
+  receiverLat: '',
+  receiverLon: '',
+  // durable event log (NDJSON per day in the user-data dir)
+  logEvents: false,
+  logRetentionDays: 14,
+  // alert rules: {id, name, enabled, deviceKey|'', metric, op, value, from, to}
+  alertRules: [],
+  closeToTray: false,
 };
 
 class Settings {

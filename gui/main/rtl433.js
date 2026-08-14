@@ -68,6 +68,15 @@ function buildArgs(s) {
   }
 
   args.push('-F', 'json'); // line-delimited JSON on stdout is our transport
+
+  // optional MQTT republishing straight from rtl_433 (Home Assistant et al.)
+  if (s.mqttEnabled && s.mqttHost) {
+    let mqtt = `mqtt://${s.mqttHost}:${s.mqttPort || 1883}`;
+    if (s.mqttUser) mqtt += `,user=${s.mqttUser}`;
+    if (s.mqttPass) mqtt += `,pass=${s.mqttPass}`;
+    if (s.mqttRetain) mqtt += ',retain=1';
+    args.push('-F', mqtt);
+  }
   return args;
 }
 
