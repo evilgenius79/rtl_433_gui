@@ -11,6 +11,7 @@ import { initShips, refreshShips } from './views/ships.js';
 import { initSpectrum, refreshSpectrum } from './views/spectrum.js';
 import { initConsole } from './views/console.js';
 import { initSettings } from './views/settings.js';
+import { initAbout } from './views/about.js';
 
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
@@ -23,6 +24,7 @@ const VIEW_TITLES = {
   spectrum: 'Spectrum',
   console: 'Console',
   settings: 'Settings',
+  about: 'About & credits',
 };
 
 const MODE_NAMES = { ism: 'ISM', adsb: 'ADS-B', pocsag: 'Pagers', sonde: 'Sonde', ais: 'AIS', spectrum: 'Spectrum' };
@@ -326,6 +328,7 @@ async function main() {
   initSpectrum();
   initConsole();
   initSettings();
+  initAbout();
 
   // land on the view matching the saved receiver mode
   const homeView = MODE_HOME_VIEW[store.settings.receiverMode || 'ism'];

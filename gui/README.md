@@ -41,6 +41,8 @@ console with six receiver modes that run concurrently across multiple dongles.
 - **Demo mode** — every mode has a realistic simulator; explore the whole app
   with no hardware.
 - **Auto-update** — packaged builds update themselves from GitHub Releases.
+- **About tab** — in-app credits for every project this app builds on, with
+  licenses and links.
 
 Each mode runs its receiver tool as a managed child process and the exact
 command line used is always shown in the Console view; POCSAG, Mode S/ADS-B

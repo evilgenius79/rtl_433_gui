@@ -180,6 +180,12 @@ function createWindow() {
     if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
   });
+  win.webContents.on('will-navigate', (e, url) => {
+    if (!url.startsWith('file://')) {
+      e.preventDefault();
+      if (url.startsWith('https://')) shell.openExternal(url);
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -224,7 +230,7 @@ async function captureScreenshots(outDir) {
         `document.querySelector('.nav-item[data-view="aircraft"]').click()`
       );
       await sleep(Number(process.env.RTL433_SCREENSHOT_AIR_WAIT || 12000));
-      for (const view of ['aircraft', 'pagers', 'sonde', 'ships', 'spectrum']) {
+      for (const view of ['aircraft', 'pagers', 'sonde', 'ships', 'spectrum', 'about']) {
         await win.webContents.executeJavaScript(
           `document.querySelector('.nav-item[data-view="${view}"]').click()`
         );
