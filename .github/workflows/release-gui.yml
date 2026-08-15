@@ -104,7 +104,48 @@ jobs:
           files: |
             gui/dist/*.AppImage
             gui/dist/*.deb
-            gui/dist/latest-linux.yml
+            gui/dist/latest-linux*.yml
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Raspberry Pi & other arm64 Linux: built natively on GitHub's arm64 runners
+  # with the same script, appended to the same release.
+  release-linux-arm64:
+    needs: release
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: gui
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get install -q -y cmake gcc libusb-1.0-0-dev
+      - name: Build native receiver binaries (arm64)
+        run: ./scripts/build-rtl433-linux64.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Linux arm64 packages
+        run: npm run dist:linux:arm64
+      - name: Read GUI version
+        id: ver
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Append arm64 assets to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('gui-v{0}', steps.ver.outputs.version) }}
+          files: |
+            gui/dist/*.AppImage
+            gui/dist/*.deb
+            gui/dist/latest-linux*.yml
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

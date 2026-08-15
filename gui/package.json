@@ -1,7 +1,7 @@
 {
   "name": "rtl433-gui",
   "productName": "rtl_433 GUI",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Desktop GUI for rtl_433 - live dashboard, event log and charts for ISM sensors, ADS-B aircraft, POCSAG pagers and radiosondes",
   "main": "main/main.js",
   "license": "GPL-2.0-or-later",
@@ -15,7 +15,8 @@
     "test": "node --test \"test/*.test.js\"",
     "dist": "electron-builder --win --publish never",
     "dist:dir": "electron-builder --win --dir --publish never",
-    "dist:linux": "electron-builder --linux --publish never"
+    "dist:linux": "electron-builder --linux --x64 --publish never",
+    "dist:linux:arm64": "electron-builder --linux --arm64 --publish never"
   },
   "build": {
     "appId": "org.rtl433.gui",
@@ -71,18 +72,8 @@
     ],
     "linux": {
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
+        "AppImage",
+        "deb"
       ],
       "icon": "assets/icon.png",
       "category": "Utility",

@@ -20,8 +20,11 @@ run concurrently across multiple dongles:
 From the [**Releases**](../../releases) page:
 
 - **Windows** — `rtl_433 GUI Setup <version>.exe` (installer) or the portable `.zip`
-- **Linux** — `rtl_433 GUI-<version>.AppImage` (`chmod +x` and run, any distro)
-  or the `.deb` for Debian/Ubuntu
+- **Linux (x64)** — `rtl_433 GUI-<version>.AppImage` (`chmod +x` and run, any
+  distro) or the `.deb` for Debian/Ubuntu
+- **Raspberry Pi / Linux arm64** — the `…arm64.deb` (recommended on Raspberry
+  Pi OS 64-bit, Pi 3/4/5) or the `…arm64.AppImage`. A Pi 4 with two dongles
+  makes a great always-on receiver box.
 
 Everything is **bundled** — nine receiver tools (`rtl_433`, `rtl_adsb`,
 `rtl_fm`, `rtl_power` and five radiosonde decoders), nothing else to install —
