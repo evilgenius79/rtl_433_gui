@@ -1,8 +1,8 @@
 # rtl_433 GUI
 
 **This fork adds a polished desktop GUI for rtl_433** — a full RTL-SDR signal
-console packaged as a Windows installer, with **six receiver modes** that can
-run concurrently across multiple dongles:
+console for **Windows, Linux and Raspberry Pi**, with **six receiver modes**
+that can run concurrently across multiple dongles:
 
 | Mode | Band | What you see |
 |---|---|---|

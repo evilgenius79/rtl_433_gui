@@ -1,8 +1,10 @@
 # rtl_433 GUI
 
 A polished desktop GUI for [rtl_433](https://github.com/merbanan/rtl_433) and
-friends, built for Windows (runs on Linux/macOS too) — an RTL-SDR signal
-console with six receiver modes that run concurrently across multiple dongles.
+friends — an RTL-SDR signal console with six receiver modes that run
+concurrently across multiple dongles. Packaged for **Windows** (installer +
+portable zip), **Linux x64** (AppImage + deb) and **Raspberry Pi / Linux
+arm64** (AppImage + deb); macOS runs from source.
 
 ![dashboard](docs/dashboard.png)
 
@@ -60,33 +62,42 @@ npm start          # normal mode (expects rtl_433 on PATH or set in Settings)
 npm run start:demo # demo mode, no hardware needed
 ```
 
-## Installing on Windows
+## Installing
 
-Grab **`rtl_433 GUI Setup <version>.exe`** from the repository's
-[Releases](../../../releases) page (or the portable `.zip` if you prefer no
-installer) and run it — all receiver tools are bundled, and the app keeps
-itself up to date from Releases.
+From the repository's [Releases](../../../releases) page:
 
-## Building the Windows installer
+- **Windows** — `rtl_433 GUI Setup <version>.exe` (or the portable `.zip`)
+- **Linux x64** — the `.AppImage` (`chmod +x`, runs anywhere) or the `.deb`
+- **Raspberry Pi / Linux arm64** — the `…arm64.deb` (Raspberry Pi OS 64-bit,
+  Pi 3/4/5) or the `…arm64.AppImage`
+
+All receiver tools are bundled and the app keeps itself up to date from
+Releases. One-time dongle setup: Windows needs the WinUSB driver (Zadig);
+Linux needs the rtl-sdr udev rules (`sudo apt install rtl-sdr`).
+
+## Building the packages
 
 ```sh
 cd gui
 npm install
-npm run dist       # produces dist/rtl_433 GUI Setup <version>.exe (NSIS) + portable zip
+npm run dist              # Windows NSIS installer + portable zip
+./scripts/build-rtl433-linux64.sh && npm run dist:linux        # Linux x64 AppImage + deb
+./scripts/build-rtl433-linux64.sh && npm run dist:linux:arm64  # on an arm64 host
 ```
 
-(On Linux/macOS the NSIS step needs Wine; the portable Windows zip builds
-everywhere.)
+(Building the Windows NSIS installer on Linux/macOS needs Wine; the portable
+zip builds everywhere.)
 
-The GitHub Actions workflow `.github/workflows/build-gui.yml` builds the
-installer on every push that touches `gui/`, uploading it as a build artifact —
-and pushing a tag like **`gui-v0.1.0`** publishes it automatically as a GitHub
-Release with the `.exe` attached.
+CI does all of this automatically: `.github/workflows/build-gui.yml` runs the
+tests and builds on every push that touches `gui/`, and dispatching
+`.github/workflows/release-gui.yml` (or pushing a `gui-v*` tag) publishes a
+GitHub Release with the Windows, Linux x64 and Linux arm64 packages attached.
 
 ### Bundled binaries
 
-Installer and zip builds ship with statically linked, self-contained tools,
-cross-compiled by `gui/scripts/build-rtl433-win64.sh` (run automatically in
+Every package ships with self-contained receiver tools — cross-compiled for
+Windows by `gui/scripts/build-rtl433-win64.sh`, built natively for Linux
+x64/arm64 by `gui/scripts/build-rtl433-linux64.sh` (both run automatically in
 CI) — no separate installs needed:
 
 | Binary | Source | Used for |
