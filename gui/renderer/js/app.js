@@ -29,6 +29,12 @@ const VIEW_TITLES = {
 
 const MODE_NAMES = { ism: 'ISM', adsb: 'ADS-B', pocsag: 'Pagers', sonde: 'Sonde', ais: 'AIS', spectrum: 'Spectrum' };
 const MODE_HOME_VIEW = { ism: 'dashboard', adsb: 'aircraft', pocsag: 'pagers', sonde: 'sonde', ais: 'ships', spectrum: 'spectrum' };
+// navigating to a mode's view selects that mode (and its frequency) in the
+// top bar; neutral views (console, settings, about) leave the selection alone
+const VIEW_MODE = {
+  dashboard: 'ism', events: 'ism', charts: 'ism',
+  aircraft: 'adsb', pagers: 'pocsag', sonde: 'sonde', ships: 'ais', spectrum: 'spectrum',
+};
 // which device-setting key each mode's pipeline uses (for conflict warnings)
 const MODE_DEVICE_KEY = {
   ism: 'device', adsb: 'adsbDevice', pocsag: 'pagerDevice',
@@ -57,6 +63,20 @@ function showView(name) {
   if (name === 'sonde') refreshSonde();
   if (name === 'ships') refreshShips();
   if (name === 'spectrum') refreshSpectrum();
+  syncModeToView(name);
+}
+
+// keep the top-bar mode selection (and frequency chip) in step with the view
+async function syncModeToView(viewName) {
+  const mode = VIEW_MODE[viewName];
+  if (!mode || !store.settings || (store.settings.receiverMode || 'ism') === mode) return;
+  const res = await window.rtl433.setMode(mode);
+  if (res.ok === false) return;
+  store.settings.receiverMode = mode;
+  const sel = document.getElementById('mode-select');
+  if (sel) sel.value = mode;
+  window.updateFreqChip();
+  updateStatusUI();
 }
 
 // ---- toasts ----

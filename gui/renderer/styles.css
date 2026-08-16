@@ -169,7 +169,10 @@ body {
      the right of the titlebar area (falls back to 18px where env() is unset) */
   padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 18px)));
 }
-.topbar button, .topbar .status-pill, .topbar .freq-chip { -webkit-app-region: no-drag; }
+/* every interactive control must opt out of the drag region, or clicks on it
+   start a window drag on Windows instead of reaching the control */
+.topbar button, .topbar select, .topbar input, .topbar .status-pill, .topbar .freq-chip { -webkit-app-region: no-drag; }
+.sidebar input, .sidebar select, .sidebar a { -webkit-app-region: no-drag; }
 
 .view-title {
   font-size: 17px;
