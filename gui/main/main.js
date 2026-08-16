@@ -410,7 +410,23 @@ ipcMain.handle('rt:setDemoMode', (_e, on) => {
 });
 
 ipcMain.handle('rt:getSettings', () => settings.data);
-ipcMain.handle('rt:saveSettings', (_e, patch) => settings.save(patch));
+ipcMain.handle('rt:saveSettings', (_e, patch) => {
+  const data = settings.save(patch);
+  // a running ISM receiver keeps its old command line — restart it so the
+  // saved frequency/gain/decoders actually take effect
+  if (proc.running) {
+    send('rt:log', { stream: 'app', line: 'settings saved — restarting rtl_433 to apply' });
+    proc.once('status', (s) => {
+      if (s.state !== 'running' && !manualStop) {
+        setTimeout(() => {
+          if (!proc.running && !manualStop) proc.start(settings.data);
+        }, 400);
+      }
+    });
+    proc.stop();
+  }
+  return data;
+});
 
 ipcMain.handle('rt:pickBinary', async () => {
   const res = await dialog.showOpenDialog(win, {
