@@ -1,14 +1,35 @@
 'use strict';
-// Spectrum mode: two sub-functions sharing one dongle.
-// - Sweep: rtl_power scans a range and emits CSV rows; full sweeps are
-//   assembled and pushed to the renderer for the waterfall.
-// - Listen: rtl_fm streams demodulated audio (FM or AM) to the renderer for
-//   playback. Starting one stops the other (same physical device).
+// Spectrum mode: three sub-functions sharing one dongle.
+// - Live: for spans that fit the dongle's real-time bandwidth (≤2 MHz),
+//   rtl_sdr streams raw IQ and we FFT it here — a fluid ~20 fps waterfall.
+// - Sweep: for wider spans, rtl_power scans the range and emits CSV rows;
+//   full sweeps are assembled and pushed to the renderer (~1 frame/interval).
+// - Listen: rtl_fm streams demodulated audio to the renderer for playback.
+// Starting one stops the others (same physical device).
 const { spawn } = require('child_process');
 const { EventEmitter } = require('events');
 const fs = require('fs');
 const path = require('path');
 const { resolveRtlFm } = require('./pager-source');
+const { freqToHz } = require('./rtl433');
+const { PowerSpectrum } = require('./fft');
+
+// live-FFT tuning: 4096 bins, 4 windows averaged per frame, ~20 fps
+const LIVE_SPAN_MAX = 2.0e6;
+const FFT_N = 4096;
+const FRAME_MS = 50;
+const FRAME_AVG = 4;
+
+// Which bins of a rate-wide FFT centered on centerHz cover [startHz, stopHz]?
+// Returns null when the requested span misses the captured window entirely.
+function cropRange(centerHz, rateHz, n, startHz, stopHz) {
+  const binHz = rateHz / n;
+  const firstHz = centerHz - rateHz / 2;
+  let i0 = Math.max(0, Math.ceil((startHz - firstHz) / binHz));
+  let i1 = Math.min(n - 1, Math.floor((stopHz - firstHz) / binHz));
+  if (i1 < i0) return null;
+  return { i0, i1, startHz: firstHz + i0 * binHz, stopHz: firstHz + i1 * binHz, stepHz: binHz };
+}
 
 // demodulator -> rtl_fm arguments and the resulting audio sample rate
 const DEMODS = {
@@ -19,26 +40,43 @@ const DEMODS = {
   lsb: { args: ['-M', 'lsb', '-s', '24000'], rate: 24000 },
 };
 
+// packaged builds carry the tools in resourcesPath/rtl_433; a from-source
+// checkout has them in gui/vendor (win) or gui/vendor-linux (linux/pi)
+function toolCandidates(exe) {
+  const vendorDir = process.platform === 'win32' ? 'vendor' : 'vendor-linux';
+  return [
+    path.join(process.resourcesPath || '.', 'rtl_433', exe),
+    path.join(__dirname, '..', vendorDir, 'rtl_433', exe),
+  ];
+}
+
 function resolveRtlPower(configured) {
   if (configured && configured.trim()) return configured.trim();
   const exe = process.platform === 'win32' ? 'rtl_power.exe' : 'rtl_power';
-  for (const c of [
-    path.join(process.resourcesPath || '.', 'rtl_433', exe),
-    path.join(__dirname, '..', 'vendor', 'rtl_433', exe),
-  ]) {
+  for (const c of toolCandidates(exe)) {
     if (fs.existsSync(c)) return c;
   }
   return exe;
 }
 
+function resolveRtlSdr(configured) {
+  if (configured && configured.trim()) return configured.trim();
+  const exe = process.platform === 'win32' ? 'rtl_sdr.exe' : 'rtl_sdr';
+  for (const c of toolCandidates(exe)) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null; // older install without the bundled rtl_sdr — fall back to sweep
+}
+
 class SpectrumSource extends EventEmitter {
   constructor() {
     super();
-    this.child = null; // rtl_power OR rtl_fm depending on submode
-    this.submode = null; // 'sweep' | 'listen'
+    this.child = null; // rtl_sdr, rtl_power or rtl_fm depending on submode
+    this.submode = null; // 'live' | 'sweep' | 'listen'
     this.stopping = false;
     this._buf = '';
     this._sweep = null; // accumulating sweep {startHz, stopHz, stepHz, dbs[]}
+    this._iq = null; // live-FFT state {chunks, bytes, timer, ps, acc, ...}
   }
 
   get running() {
@@ -46,7 +84,89 @@ class SpectrumSource extends EventEmitter {
   }
 
   start(settings) {
+    // a span the dongle can capture in one go gets the real-time FFT
+    // waterfall; anything wider falls back to the rtl_power scan
+    const startHz = freqToHz(settings.spectrumStart || '433M');
+    const stopHz = freqToHz(settings.spectrumStop || '435M');
+    const span = stopHz - startHz;
+    if (isFinite(span) && span > 0 && span <= LIVE_SPAN_MAX && resolveRtlSdr(settings.rtlSdrPath)) {
+      return this._startLive(settings, startHz, stopHz);
+    }
     return this._startSweep(settings);
+  }
+
+  _startLive(settings, startHz, stopHz) {
+    if (this.child) return { ok: false, error: 'already running' };
+    const bin = resolveRtlSdr(settings.rtlSdrPath);
+    const centerHz = Math.round((startHz + stopHz) / 2);
+    const rate = stopHz - startHz <= 0.9e6 ? 1024000 : 2048000;
+    const args = ['-f', String(centerHz), '-s', String(rate)];
+    if (settings.spectrumDevice) args.push('-d', String(settings.spectrumDevice));
+    if (settings.spectrumGain !== '' && settings.spectrumGain != null) args.push('-g', String(settings.spectrumGain));
+    if (settings.ppmError) args.push('-p', String(settings.ppmError));
+    args.push('-'); // IQ to stdout
+
+    this.stopping = false;
+    const res = this._spawnCommon(bin, args, 'rtl_sdr', 'spectrum');
+    if (res.error) return { ok: false, error: res.error };
+    this.submode = 'live';
+    this.emit('status', { state: 'running', pid: res.child.pid, mode: 'spectrum', submode: 'live' });
+
+    const crop = cropRange(centerHz, rate, FFT_N, startHz, stopHz);
+    const windowBytes = FFT_N * 2;
+    const neededBytes = windowBytes * FRAME_AVG;
+    const iq = {
+      chunks: [],
+      bytes: 0,
+      ps: new PowerSpectrum(FFT_N),
+      acc: new Float64Array(FFT_N),
+      crop,
+      timer: null,
+    };
+    this._iq = iq;
+
+    res.child.stdout.on('data', (chunk) => {
+      iq.chunks.push(chunk);
+      iq.bytes += chunk.length;
+      // keep only the freshest ~2 frames' worth; IQ is perishable
+      while (iq.bytes - iq.chunks[0].length > neededBytes * 2) {
+        iq.bytes -= iq.chunks.shift().length;
+      }
+    });
+
+    iq.timer = setInterval(() => {
+      if (iq.bytes < neededBytes || this._iq !== iq) return;
+      const buf = iq.chunks.length === 1 ? iq.chunks[0] : Buffer.concat(iq.chunks);
+      iq.chunks = [buf];
+      iq.bytes = buf.length;
+      iq.acc.fill(0);
+      // FFT the newest FRAME_AVG windows and average them
+      const lastPair = Math.floor(buf.length / 2);
+      for (let w = 0; w < FRAME_AVG; w++) {
+        iq.ps.accumulate(buf, lastPair - FFT_N * (w + 1), iq.acc);
+      }
+      const dbs = iq.ps.toDb(iq.acc, FRAME_AVG);
+      const c = iq.crop;
+      this.emit('spectrum', {
+        startHz: c ? c.startHz : centerHz - rate / 2,
+        stopHz: c ? c.stopHz : centerHz + rate / 2,
+        stepHz: c ? c.stepHz : rate / FFT_N,
+        dbs: c ? dbs.slice(c.i0, c.i1 + 1) : dbs,
+        live: true,
+        time: Date.now(),
+      });
+      // consumed — start collecting the next frame fresh
+      iq.chunks = [];
+      iq.bytes = 0;
+    }, FRAME_MS);
+    return { ok: true, pid: res.child.pid };
+  }
+
+  _stopLiveTimer() {
+    if (this._iq) {
+      clearInterval(this._iq.timer);
+      this._iq = null;
+    }
   }
 
   _spawnCommon(bin, args, label, mode) {
@@ -73,6 +193,7 @@ class SpectrumSource extends EventEmitter {
       this.child = null;
       this.submode = null;
       this.stopping = false;
+      this._stopLiveTimer();
       const why = signal ? `signal ${signal}` : `exit code ${code}`;
       this.emit('log', { stream: 'app', line: `${label} stopped (${why})` });
       this.emit('status', {
@@ -179,11 +300,12 @@ class SpectrumSource extends EventEmitter {
   stopListen(settings) {
     if (this.submode !== 'listen') return { ok: true };
     this._switchOff();
-    // resume sweeping on the same device
-    return this._startSweep(settings);
+    // resume watching the band on the same device (live FFT or sweep)
+    return this.start(settings);
   }
 
   _switchOff() {
+    this._stopLiveTimer();
     const child = this.child;
     this.child = null;
     this.submode = null;
@@ -204,6 +326,7 @@ class SpectrumSource extends EventEmitter {
   }
 
   stop() {
+    this._stopLiveTimer();
     if (!this.child) return { ok: true };
     this.stopping = true;
     const child = this.child;
@@ -225,4 +348,4 @@ class SpectrumSource extends EventEmitter {
   }
 }
 
-module.exports = { SpectrumSource, resolveRtlPower };
+module.exports = { SpectrumSource, resolveRtlPower, resolveRtlSdr, cropRange };

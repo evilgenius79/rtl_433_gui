@@ -28,8 +28,9 @@ arm64** (AppImage + deb); macOS runs from source.
   altitude, climb, wind and PTU telemetry via the bundled rs1729/RS decoders.
 - **Ships (AIS)** — vessels with wakes on the map, decoded in-app (HDLC,
   CRC-16/X.25, position + static reports).
-- **Spectrum + tuner** — rtl_power sweeps with live trace, max hold and
-  waterfall; band presets; plus a general-coverage tuner (WFM / NBFM / AM /
+- **Spectrum + tuner** — real-time FFT waterfall (~20 fps, rtl_sdr raw IQ)
+  for ranges up to 2 MHz, rtl_power scans for wider ones; live trace, max
+  hold, band presets; plus a general-coverage tuner (WFM / NBFM / AM /
   USB / LSB) with step buttons, squelch and bookmarks — click a peak on the
   trace to tune it.
 - **Alert rules** — thresholds, change detection and time windows per
@@ -105,7 +106,8 @@ CI) — no separate installs needed:
 | `rtl_433.exe` | this repository (GPL-2) | ISM sensor decoding |
 | `rtl_adsb.exe` | osmocom rtl-sdr tools (GPL-2) | raw Mode S frames for the aircraft map |
 | `rtl_fm.exe` | osmocom rtl-sdr tools (GPL-2) | FM demodulation for pagers, sondes, AIS & listening |
-| `rtl_power.exe` | osmocom rtl-sdr tools (GPL-2) | spectrum sweeps |
+| `rtl_power.exe` | osmocom rtl-sdr tools (GPL-2) | wide-range spectrum scans |
+| `rtl_sdr.exe` | osmocom rtl-sdr tools (GPL-2) | raw IQ for the live FFT waterfall |
 | `rs41mod.exe`, `dfm09mod.exe`, `m10mod.exe`, `m20mod.exe`, `imet54mod.exe` | [rs1729/RS](https://github.com/rs1729/RS) (GPL-3) | radiosonde telemetry |
 
 POCSAG, Mode S/ADS-B and AIS decoding is implemented in the app itself

@@ -11,9 +11,17 @@ that can run concurrently across multiple dongles:
 | **POCSAG pagers** | regional VHF/UHF | live message table (alpha + numeric) |
 | **Radiosondes** | 400–406 MHz | balloon on the map with full telemetry (5 sonde types) |
 | **AIS ships** | 161.975 / 162.025 MHz | vessels with wakes on the map |
-| **Spectrum** | anywhere | sweep trace + waterfall, click-to-tune audio monitor |
+| **Spectrum** | anywhere | real-time FFT waterfall, wide-band scans, click-to-tune audio monitor |
 
 ![rtl_433 GUI dashboard](gui/docs/dashboard.png)
+
+**Real reception, real hardware** — live air traffic over the Midwest and
+Neptune R900 water meters decoded off 915 MHz, straight from a stock RTL-SDR
+dongle:
+
+![live ADS-B aircraft over Indiana and Ohio](gui/docs/real-aircraft.png)
+
+![Neptune R900 utility meters received at 915 MHz](gui/docs/real-meters.png)
 
 ## Download
 
@@ -26,8 +34,9 @@ From the [**Releases**](../../releases) page:
   Pi OS 64-bit, Pi 3/4/5) or the `…arm64.AppImage`. A Pi 4 with two dongles
   makes a great always-on receiver box.
 
-Everything is **bundled** — nine receiver tools (`rtl_433`, `rtl_adsb`,
-`rtl_fm`, `rtl_power` and five radiosonde decoders), nothing else to install —
+Everything is **bundled** — ten receiver tools (`rtl_433`, `rtl_adsb`,
+`rtl_fm`, `rtl_power`, `rtl_sdr` and five radiosonde decoders), nothing else
+to install —
 and the app **updates itself** from GitHub Releases. Plug in your RTL-SDR
 dongle and press **Start** — or flip on **Demo mode** in the sidebar to
 explore every view with simulated traffic, no hardware needed.
@@ -103,10 +112,14 @@ and wakes.
 
 ![ships](gui/docs/ships.png)
 
-**Spectrum analyzer + tuner** — sweep any range with the bundled `rtl_power`:
-a live trace with max-hold plus a scrolling waterfall, band presets (ISM
-433/868, pagers, airband, marine), and click-to-read frequencies. Below it, a
-full **general-coverage tuner**: dial in any frequency the dongle supports
+**Spectrum analyzer + tuner** — ranges up to 2 MHz wide get a **real-time
+waterfall**: the bundled `rtl_sdr` streams raw IQ and the app FFTs it at
+~20 frames/s with ~500 Hz resolution, so individual sensor bursts and key-fob
+presses flash past like on a proper SDR console. Wider ranges are scanned
+with the bundled `rtl_power` (a frame per sweep). Both share the same live
+trace with max-hold, scrolling waterfall, band presets (ISM 433/868, pagers,
+airband, marine) and click-to-read frequencies. Below it, a full
+**general-coverage tuner**: dial in any frequency the dongle supports
 (24 MHz–1.7 GHz), pick a demodulator — **WFM** for broadcast radio, **NBFM**,
 **AM** for airband, **USB/LSB** for SSB — with step buttons, squelch, savable
 bookmarks and live retuning. Click a peak on the trace to tune straight to it.

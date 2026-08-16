@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds the native Linux receiver binaries bundled with the GUI's Linux
-# packages: rtl_433, the rtl-sdr tools (rtl_fm, rtl_adsb, rtl_power) linked
-# against a static librtlsdr, and the rs1729/RS radiosonde decoders.
+# packages: rtl_433, the rtl-sdr tools (rtl_fm, rtl_adsb, rtl_power, rtl_sdr)
+# linked against a static librtlsdr, and the rs1729/RS radiosonde decoders.
 # librtlsdr is linked statically; libusb-1.0 stays a (ubiquitous) system dep.
 # Requires: gcc, cmake, git, libusb-1.0-0-dev.
 # Output: gui/vendor-linux/rtl_433/
@@ -28,6 +28,7 @@ sed -i \
     -e 's/target_link_libraries(rtl_adsb rtlsdr convenience_static/target_link_libraries(rtl_adsb rtlsdr_static convenience_static/' \
     -e 's/target_link_libraries(rtl_fm rtlsdr convenience_static/target_link_libraries(rtl_fm rtlsdr_static convenience_static/' \
     -e 's/target_link_libraries(rtl_power rtlsdr convenience_static/target_link_libraries(rtl_power rtlsdr_static convenience_static/' \
+    -e 's/target_link_libraries(rtl_sdr rtlsdr convenience_static/target_link_libraries(rtl_sdr rtlsdr_static convenience_static/' \
     rtl-sdr-${rtlsdr_ver}/src/CMakeLists.txt
 cmake -S rtl-sdr-${rtlsdr_ver} -B build-rtlsdr \
     -DCMAKE_BUILD_TYPE=Release \
@@ -58,7 +59,7 @@ out="$gui_dir/vendor-linux/rtl_433"
 mkdir -p "$out"
 cp build-rtl433/src/rtl_433 "$out/"
 # prefer the statically-linked tool builds from the build tree
-cp build-rtlsdr/src/rtl_fm build-rtlsdr/src/rtl_adsb build-rtlsdr/src/rtl_power "$out/"
+cp build-rtlsdr/src/rtl_fm build-rtlsdr/src/rtl_adsb build-rtlsdr/src/rtl_power build-rtlsdr/src/rtl_sdr "$out/"
 cp rs41mod dfm09mod m10mod m20mod imet54mod "$out/"
 strip "$out"/* 2>/dev/null || true
 echo "Bundled Linux binaries ready in $out: $(ls "$out" | tr '\n' ' ')"

@@ -191,14 +191,14 @@ export async function initSettings() {
 
     <div class="settings-card">
       <h3>Spectrum</h3>
-      <div class="card-sub">Band sweeping with the bundled rtl_power; presets are on the Spectrum view.</div>
+      <div class="card-sub">Ranges up to 2 MHz wide get a real-time FFT waterfall (bundled rtl_sdr); wider ranges are scanned with rtl_power. Presets are on the Spectrum view.</div>
       <div class="form-row">
         <div><div class="form-label">SDR device</div><div class="form-hint">Dongle index for sweeping and the audio monitor.</div></div>
         <div class="form-field"><input type="text" id="s-sp-dev" style="width:110px" placeholder="0" /></div>
       </div>
       <div class="form-row">
         <div><div class="form-label">Range</div>
-          <div class="form-hint">Start, stop and bin size for the sweep.</div></div>
+          <div class="form-hint">Start and stop of the watched band. Step sets the scan's bin size (the live waterfall picks its own, ~500 Hz).</div></div>
         <div class="form-field">
           <input type="text" id="s-sp-start" style="width:100px" placeholder="433M" />
           <span class="form-hint">to</span>
@@ -208,7 +208,7 @@ export async function initSettings() {
         </div>
       </div>
       <div class="form-row">
-        <div><div class="form-label">Sweep interval</div><div class="form-hint">Seconds of integration per sweep row.</div></div>
+        <div><div class="form-label">Sweep interval</div><div class="form-hint">Seconds of integration per scan row (wide ranges only — the live waterfall runs at ~20 fps).</div></div>
         <div class="form-field"><input type="number" id="s-sp-int" min="1" style="width:90px" /> <span class="form-hint">s</span></div>
       </div>
       <div class="form-row">

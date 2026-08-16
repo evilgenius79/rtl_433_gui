@@ -98,8 +98,8 @@ export function initSpectrum() {
     </div>
     <div class="empty-state" id="sp-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12h3l2-7 4 14 3-10 2 3h6"/></svg>
-      <div class="big">No sweeps yet</div>
-      <div class="small">Select <b>Spectrum</b> in the top bar and press <b>Start</b> to sweep with rtl_power — or flip on <b>Demo mode</b> for a synthetic band. Click the trace to read off a frequency.</div>
+      <div class="big">No spectrum yet</div>
+      <div class="small">Select <b>Spectrum</b> in the top bar and press <b>Start</b>. Ranges up to 2 MHz wide get a <b>real-time waterfall</b> (raw IQ + FFT); wider ranges are scanned with rtl_power at about a frame per second. Flip on <b>Demo mode</b> for a synthetic band. Click the trace to read off a frequency.</div>
     </div>`;
 
   const presetHost = document.getElementById('sp-presets');
@@ -115,7 +115,14 @@ export function initSpectrum() {
         spectrumStep: p.step,
       });
       maxHold = null;
-      window.toast(`Sweep range set to ${p.label} — restart the spectrum to apply.`);
+      // retune a running spectrum straight away
+      if (store.modeStatus.spectrum?.state === 'running' && store.modeStatus.spectrum?.submode !== 'listen') {
+        await window.rtl433.stop('spectrum');
+        await window.rtl433.start('spectrum');
+        window.toast(`Range set to ${p.label}.`);
+      } else {
+        window.toast(`Range set to ${p.label} — press Start to watch it.`);
+      }
     });
     presetHost.appendChild(b);
   }
@@ -224,7 +231,8 @@ export function initSpectrum() {
       drawTrace();
       drawWaterfall(sweep);
       document.getElementById('sp-range').textContent =
-        `${(sweep.startHz / 1e6).toFixed(3)} – ${(sweep.stopHz / 1e6).toFixed(3)} MHz · ${sweep.dbs.length.toLocaleString()} bins`;
+        `${(sweep.startHz / 1e6).toFixed(3)} – ${(sweep.stopHz / 1e6).toFixed(3)} MHz · ${sweep.dbs.length.toLocaleString()} bins` +
+        (sweep.live ? ' · live' : '');
     }
   });
 
@@ -233,7 +241,9 @@ export function initSpectrum() {
   store.on('status', () => {
     const s = store.modeStatus.spectrum || { state: 'stopped' };
     document.getElementById('sp-status').textContent =
-      s.state === 'running' ? (s.submode === 'listen' ? 'listening' : 'sweeping') : s.state;
+      s.state === 'running'
+        ? { listen: 'listening', live: 'live waterfall' }[s.submode] || 'sweeping'
+        : s.state;
     if (s.state !== 'running' && listening) setListenUI(false);
   });
 }

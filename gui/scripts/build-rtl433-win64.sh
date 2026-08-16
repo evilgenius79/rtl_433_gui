@@ -48,6 +48,7 @@ sed -i \
     -e 's/target_link_libraries(rtl_adsb rtlsdr convenience_static/target_link_libraries(rtl_adsb rtlsdr_static convenience_static/' \
     -e 's/target_link_libraries(rtl_fm rtlsdr convenience_static/target_link_libraries(rtl_fm rtlsdr_static convenience_static/' \
     -e 's/target_link_libraries(rtl_power rtlsdr convenience_static/target_link_libraries(rtl_power rtlsdr_static convenience_static/' \
+    -e 's/target_link_libraries(rtl_sdr rtlsdr convenience_static/target_link_libraries(rtl_sdr rtlsdr_static convenience_static/' \
     rtl-sdr-${rtlsdr_ver}/src/CMakeLists.txt
 if [ ! -e "$sysroot/usr/lib/librtlsdr.a" ]; then
     export CMAKE_SYSROOT=$sysroot
@@ -92,8 +93,10 @@ mkdir -p "$out"
 cp "$sysroot/usr/bin/rtl_433.exe" "$out/rtl_433.exe"
 # rtl_adsb feeds the aircraft map with raw Mode S frames; rtl_fm feeds the
 # pager / radiosonde / AIS / listen pipelines; rtl_power feeds the spectrum
+# scan; rtl_sdr streams raw IQ for the live FFT waterfall
 cp "$sysroot/usr/bin/rtl_adsb.exe" "$out/rtl_adsb.exe"
 cp "$sysroot/usr/bin/rtl_fm.exe" "$out/rtl_fm.exe"
 cp "$sysroot/usr/bin/rtl_power.exe" "$out/rtl_power.exe"
+cp "$sysroot/usr/bin/rtl_sdr.exe" "$out/rtl_sdr.exe"
 cp rs41mod.exe dfm09mod.exe m10mod.exe m20mod.exe imet54mod.exe "$out/"
 echo "Bundled binaries ready in $out: $(ls "$out" | tr '\n' ' ')"
