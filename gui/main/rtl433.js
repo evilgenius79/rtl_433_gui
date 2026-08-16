@@ -67,6 +67,9 @@ function buildArgs(s) {
     while ((m = re.exec(s.extraArgs)) !== null) args.push(m[1] != null ? m[1] : m[2]);
   }
 
+  // without an explicit log output, rtl_433 suppresses its own errors and
+  // warnings once another -F output is set — keep them flowing to stderr
+  args.push('-F', 'log');
   args.push('-F', 'json'); // line-delimited JSON on stdout is our transport
 
   // optional MQTT republishing straight from rtl_433 (Home Assistant et al.)
@@ -80,6 +83,16 @@ function buildArgs(s) {
   return args;
 }
 
+// translate rtl_433's stderr failure signatures into actionable messages
+const STDERR_HINTS = [
+  [/usb_open error|usb_claim_interface|Device or resource busy|rtlsdr_open/i,
+    'the SDR could not be opened — it may be in use by another mode, or (on Windows) this dongle still needs its WinUSB driver installed with Zadig. Each dongle needs Zadig run once.'],
+  [/No supported devices found|no device found/i,
+    'no SDR was found — check the dongle is plugged in and (on Windows) has the WinUSB driver via Zadig; with several dongles, check the device index in Settings.'],
+  [/Failed to open rtlsdr device/i,
+    'the selected device index does not exist — with one dongle use 0, with two use 0 and 1 (see Settings).'],
+];
+
 class Rtl433Process extends EventEmitter {
   constructor() {
     super();
@@ -87,6 +100,7 @@ class Rtl433Process extends EventEmitter {
     this.stopping = false;
     this._stdoutBuf = '';
     this._stderrBuf = '';
+    this._stderrHint = null;
   }
 
   get running() {
@@ -125,6 +139,7 @@ class Rtl433Process extends EventEmitter {
       }
     });
 
+    this._stderrHint = null;
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk) => {
       this._stderrBuf += chunk;
@@ -132,7 +147,16 @@ class Rtl433Process extends EventEmitter {
       while ((idx = this._stderrBuf.indexOf('\n')) >= 0) {
         const line = this._stderrBuf.slice(0, idx).replace(/\r$/, '');
         this._stderrBuf = this._stderrBuf.slice(idx + 1);
-        if (line.trim()) this.emit('log', { stream: 'stderr', line });
+        if (!line.trim()) continue;
+        this.emit('log', { stream: 'stderr', line });
+        if (!this._stderrHint) {
+          for (const [re, hint] of STDERR_HINTS) {
+            if (re.test(line)) {
+              this._stderrHint = hint;
+              break;
+            }
+          }
+        }
       }
     });
 
@@ -147,15 +171,32 @@ class Rtl433Process extends EventEmitter {
       this.emit('log', { stream: 'app', line: `error: ${hint}` });
     });
 
-    child.on('exit', (code, signal) => {
+    // 'close' (not 'exit') so all stderr has been delivered before we decide
+    // what error message to show
+    child.on('close', (code, signal) => {
       const wasStopping = this.stopping;
       this.child = null;
       this.stopping = false;
+      // scan any trailing stderr that arrived without a final newline
+      if (!this._stderrHint && this._stderrBuf.trim()) {
+        for (const [re, hint] of STDERR_HINTS) {
+          if (re.test(this._stderrBuf)) {
+            this._stderrHint = hint;
+            break;
+          }
+        }
+      }
+      this._stderrBuf = '';
       const why = signal ? `signal ${signal}` : `exit code ${code}`;
       this.emit('log', { stream: 'app', line: `rtl_433 stopped (${why})` });
+      const failed = !wasStopping && code !== 0;
       this.emit('status', {
-        state: wasStopping || code === 0 ? 'stopped' : 'error',
-        error: wasStopping || code === 0 ? undefined : `rtl_433 exited unexpectedly (${why})`,
+        state: failed ? 'error' : 'stopped',
+        error: failed
+          ? this._stderrHint
+            ? `rtl_433 failed: ${this._stderrHint}`
+            : `rtl_433 exited unexpectedly (${why}) — see the Console view for details`
+          : undefined,
         code,
         signal,
       });

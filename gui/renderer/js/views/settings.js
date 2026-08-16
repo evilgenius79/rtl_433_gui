@@ -4,11 +4,14 @@ import { store } from '../state.js';
 
 const root = document.getElementById('view-settings');
 
+// presets set the recommended sample rate too: the 900/868 bands want a wide
+// window (hopping US meters, 868 FSK sensors); 433/315 are fine at default
 const FREQ_PRESETS = [
-  { label: '433.92 MHz', value: '433.92M' },
-  { label: '868.3 MHz', value: '868.3M' },
-  { label: '915 MHz', value: '915M' },
-  { label: '315 MHz', value: '315M' },
+  { label: '433.92 MHz', value: '433.92M', rate: '' },
+  { label: '868.3 MHz', value: '868.3M', rate: '1024k' },
+  { label: 'US meters · 915 MHz', value: '915M', rate: '1024k',
+    title: 'US utility meters (ERT electric/gas/water) hop across 902–928 MHz — expect readings to accumulate over several minutes' },
+  { label: '315 MHz', value: '315M', rate: '' },
 ];
 const RATE_OPTIONS = ['', '250k', '1024k', '2048k', '3.2M'];
 
@@ -53,7 +56,7 @@ export async function initSettings() {
       <div class="card-sub">Tuning and demodulation parameters.</div>
       <div class="form-row">
         <div><div class="form-label">Frequency</div>
-          <div class="form-hint">Comma-separate several to hop between them.</div></div>
+          <div class="form-hint">Comma-separate several to hop between them. US utility meters live at 902–928 MHz — use the US meters preset, not 433.</div></div>
         <div class="form-field">
           <input type="text" id="s-freq" class="wide" placeholder="433.92M" />
           <div class="preset-chips" id="s-freq-presets"></div>
@@ -453,9 +456,12 @@ export async function initSettings() {
     const b = document.createElement('button');
     b.className = 'preset-chip';
     b.textContent = p.label;
+    if (p.title) b.title = p.title;
     b.addEventListener('click', () => {
       g('s-freq').value = p.value;
+      g('s-rate').value = p.rate;
       markPresets();
+      if (p.rate) window.toast(`Sample rate set to ${p.rate} — recommended for this band.`);
     });
     presetHost.appendChild(b);
   }
