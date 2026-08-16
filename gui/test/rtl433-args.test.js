@@ -3,7 +3,7 @@
 // Run with: node --test gui/test/  (no dependencies needed)
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { buildArgs } = require('../main/rtl433.js');
+const { buildArgs, freqToHz } = require('../main/rtl433.js');
 const { DEFAULTS } = require('../main/settings.js');
 
 function settingsWith(patch) {
@@ -60,6 +60,33 @@ test('tuner options appear when configured', () => {
   assert.strictEqual(args[args.indexOf('-s') + 1], '1024k');
   assert.strictEqual(args[args.indexOf('-g') + 1], '28.0');
   assert.strictEqual(args[args.indexOf('-p') + 1], '12');
+});
+
+test('freqToHz parses rtl_433-style frequency strings', () => {
+  assert.strictEqual(freqToHz('915M'), 915e6);
+  assert.strictEqual(freqToHz('433.92M'), 433.92e6);
+  assert.strictEqual(freqToHz('1024k'), 1024e3);
+  assert.strictEqual(freqToHz('433920000'), 433920000);
+  assert.ok(Number.isNaN(freqToHz('nonsense')));
+});
+
+test('tuning above 600 MHz with no explicit rate defaults to 1024k', () => {
+  // rtl_433's 250k default cannot decode 868/915 MHz signals (verified by
+  // replaying reference ERT captures) — the app must widen the window
+  const a915 = buildArgs(settingsWith({ frequencies: ['915M'], sampleRate: '' }));
+  assert.strictEqual(a915[a915.indexOf('-s') + 1], '1024k');
+  const a868 = buildArgs(settingsWith({ frequencies: ['868.3M'], sampleRate: '' }));
+  assert.strictEqual(a868[a868.indexOf('-s') + 1], '1024k');
+  // hopping between a low and a high band also needs the wide window
+  const hop = buildArgs(settingsWith({ frequencies: ['433.92M', '915M'], sampleRate: '' }));
+  assert.strictEqual(hop[hop.indexOf('-s') + 1], '1024k');
+});
+
+test('low bands keep the rtl_433 default rate; explicit rates always win', () => {
+  const low = buildArgs(settingsWith({ frequencies: ['315M'], sampleRate: '' }));
+  assert.ok(!low.includes('-s'));
+  const explicit = buildArgs(settingsWith({ frequencies: ['912.6M'], sampleRate: '2359k' }));
+  assert.strictEqual(explicit[explicit.indexOf('-s') + 1], '2359k');
 });
 
 test('native units add no -C flag; si and customary do', () => {

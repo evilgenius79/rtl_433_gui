@@ -151,6 +151,21 @@ ACARS aircraft messaging, FLARM/OGN glider tracking, more sonde types, and
 feeding community networks (SondeHub, ADS-B aggregators). Contributions
 welcome.
 
+### Hearing nothing on 868/915 MHz?
+
+The sample rate matters as much as the frequency. rtl_433's default rate
+(250k) is only wide enough for the 433/315 MHz bands — at 915 MHz it decodes
+*nothing*, silently (verified by replaying reference meter captures: ERT
+decodes at 1024k, never at 250k). The GUI protects you three ways: the **US
+meters** preset tunes 912.6 MHz at a 2.36 MHz window (the rtlamr convention,
+catching the most hops of meters that roam 902–928 MHz), the app
+automatically runs at 1024k if you type a high frequency but leave the rate
+on default, and saving settings restarts a running receiver so changes
+actually apply. US utility meters transmit every 30 s or so on a *random*
+channel in the band, so readings accumulate over minutes — leave it running
+for 10–15 minutes before judging an antenna spot. The Console view always
+shows the exact command line and any receiver warnings.
+
 ---
 
 # rtl_433

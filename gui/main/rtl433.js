@@ -35,6 +35,25 @@ function resolveBinary(configured) {
   return process.platform === 'win32' ? 'rtl_433.exe' : 'rtl_433';
 }
 
+// Parse an rtl_433-style frequency/rate string ("915M", "433.92M", "1024k",
+// plain Hz) into Hz. Returns NaN when it doesn't look like a number.
+function freqToHz(v) {
+  const m = /^\s*(\d+(?:\.\d+)?)\s*([kKmMgG]?)/.exec(String(v));
+  if (!m) return NaN;
+  const mult = { '': 1, k: 1e3, K: 1e3, m: 1e6, M: 1e6, g: 1e9, G: 1e9 }[m[2]];
+  return parseFloat(m[1]) * mult;
+}
+
+// rtl_433's built-in default sample rate (250k) is only wide enough for the
+// 433/315 MHz bands. 868 MHz FSK sensors and especially the 902–928 MHz
+// hopping US utility meters are undecodable at 250k — verified by replaying
+// reference captures: ERT-SCM decodes at 1024k, silently never at 250k.
+// So when the user tunes high but leaves the rate on default, pick 1024k.
+function needsWideRate(s) {
+  if (s.sampleRate) return false;
+  return (s.frequencies || []).some((f) => freqToHz(f) >= 600e6);
+}
+
 // Translate the settings object into an rtl_433 argv array.
 function buildArgs(s) {
   const args = [];
@@ -46,6 +65,7 @@ function buildArgs(s) {
     args.push('-H', String(s.hopInterval));
   }
   if (s.sampleRate) args.push('-s', String(s.sampleRate));
+  else if (needsWideRate(s)) args.push('-s', '1024k');
   if (s.gain !== '' && s.gain != null) args.push('-g', String(s.gain));
   if (s.ppmError) args.push('-p', String(s.ppmError));
 
@@ -122,6 +142,12 @@ class Rtl433Process extends EventEmitter {
     this.child = child;
     this.emit('status', { state: 'running', pid: child.pid, binary: bin, args });
     this.emit('log', { stream: 'app', line: `$ ${bin} ${args.join(' ')}` });
+    if (needsWideRate(settings)) {
+      this.emit('log', {
+        stream: 'app',
+        line: 'note: sample rate defaulted to 1024k — rtl_433’s 250k default is too narrow to decode 868/915 MHz signals',
+      });
+    }
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
@@ -232,4 +258,4 @@ class Rtl433Process extends EventEmitter {
   }
 }
 
-module.exports = { Rtl433Process, buildArgs, resolveBinary };
+module.exports = { Rtl433Process, buildArgs, resolveBinary, freqToHz };

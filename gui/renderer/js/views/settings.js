@@ -9,11 +9,11 @@ const root = document.getElementById('view-settings');
 const FREQ_PRESETS = [
   { label: '433.92 MHz', value: '433.92M', rate: '' },
   { label: '868.3 MHz', value: '868.3M', rate: '1024k' },
-  { label: 'US meters · 915 MHz', value: '915M', rate: '1024k',
-    title: 'US utility meters (ERT electric/gas/water) hop across 902–928 MHz — expect readings to accumulate over several minutes' },
+  { label: 'US meters · 915 band', value: '912.6M', rate: '2359k',
+    title: 'US utility meters (ERT electric/gas/water) hop across 902–928 MHz. 912.6 MHz center with a 2.36 MHz window (the rtlamr convention) catches the most hops — readings still accumulate over minutes, not seconds' },
   { label: '315 MHz', value: '315M', rate: '' },
 ];
-const RATE_OPTIONS = ['', '250k', '1024k', '2048k', '3.2M'];
+const RATE_OPTIONS = ['', '250k', '1024k', '2048k', '2359k', '3.2M'];
 
 let protocols = [];
 let protoFilter = '';
@@ -69,7 +69,7 @@ export async function initSettings() {
       </div>
       <div class="form-row">
         <div><div class="form-label">Sample rate</div>
-          <div class="form-hint">Default 250k suits 433 MHz; use 1024k for 868 MHz FSK sensors.</div></div>
+          <div class="form-hint">Default 250k only suits 433/315 MHz — 868/915 MHz signals need 1024k or more, and meters like the full 2359k window. If left on default while tuned above 600 MHz, the app automatically runs at 1024k.</div></div>
         <div class="form-field">
           <select id="s-rate">${RATE_OPTIONS.map((r) => `<option value="${r}">${r || 'Default (250k)'}</option>`).join('')}</select>
         </div>
@@ -563,8 +563,18 @@ export async function initSettings() {
     draft = { ...store.settings };
     window.updateFreqChip();
     const running = store.status.state === 'running';
-    g('s-note').textContent = running ? 'Saved — stop & start the receiver to apply.' : 'Saved.';
-    window.toast('Settings saved' + (running ? ' — restart the receiver to apply' : ''), 'success');
+    g('s-note').textContent = running ? 'Saved — receiver restarted with the new settings.' : 'Saved.';
+    window.toast('Settings saved' + (running ? ' — receiver restarted to apply them' : ''), 'success');
+    // an explicitly low rate on a high band silently decodes nothing — warn
+    const toHz = (v) => {
+      const m = /^(\d+(?:\.\d+)?)([kKmMgG]?)/.exec(String(v).trim());
+      return m ? parseFloat(m[1]) * ({ '': 1, k: 1e3, K: 1e3, m: 1e6, M: 1e6, g: 1e9, G: 1e9 }[m[2]]) : NaN;
+    };
+    const maxF = Math.max(...patch.frequencies.map(toHz).filter((n) => n > 0), 0);
+    const rate = toHz(patch.sampleRate);
+    if (maxF >= 600e6 && rate > 0 && rate < 900e3) {
+      window.toast('Warning: 250k sample rate cannot decode 868/915 MHz signals — pick 1024k or higher.', 'error');
+    }
     setTimeout(() => (g('s-note').textContent = ''), 4000);
   });
 
